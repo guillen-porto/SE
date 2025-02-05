@@ -46,7 +46,7 @@ void led_red_init()
 
   PORTE->PCR[29] |= PORT_PCR_MUX(1);
 
-  GPIOE->PDDR |= GPIO_PDDR_PDD(1 << 29);
+  GPIOE->PDDR |= GPIO_PDDR_PDD(1 << 29); //Hace que el pin 29 del puerto E sea de salida (1)
 
   GPIOE->PSOR |= GPIO_PSOR_PTSO(1 << 29);
 }
@@ -63,31 +63,56 @@ void switch1_init(void){
 
     PORTC->PCR[3] |= PORT_PCR_MUX(1);
 
-    GPIOC->PDDR |= GPIO_PDDR_PDD(0 << 3); //Hace que el pin 3 del puerto C sea de entrada (0)
+    PORTC->PCR[3] |= PORT_PCR_PE(1); //Pull enable
 
+    PORTC->PCR[12] |= PORT_PCR_PS(1); //Pull up
+
+    GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 3)); //Hace que el pin 3 del puerto C sea de entrada (0)
+
+}
+
+int switch1_pressed(void){
+    return (GPIOC->PDIR & (1 << 3)) == 0;
 }
 
 //SWITCH3= PTC12
 void switch3_init(void){
     SIM->SCGC5 |= SIM_SCGC5_PORTC(1); //entiendo que solo hace falta inicializarlo una vez (en button_green_init)
 
-    PORTC->PCR[3] |= PORT_PCR_MUX(1);
+    PORTC->PCR[12] |= PORT_PCR_MUX(1);
 
-    GPIOC->PDDR |= GPIO_PDDR_PDD(0 << 12); //Hace que el pin 3 del puerto C sea de entrada (0)
+    PORTC->PCR[12] |= PORT_PCR_PE(1); //Pull enable
+
+    PORTC->PCR[12] |= PORT_PCR_PS(1); //Pull up
+
+    GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 12)); //Hace que el pin 12 del puerto C sea de entrada (0)
 }
+
+int switch3_pressed(void){
+    return (GPIOC->PDIR & (1 << 12)) == 0;
+}
+
 
 int main(void)
 {
   led_green_init();
   led_red_init();
-  button_green_init();
-  button_red_init();
+
+  switch1_init();
+  switch3_init();
 
   while (1) {
-    led_green_toggle();
+
+    if(switch1_pressed()){
+      led_green_toggle();
+      delay();
+    }
     //Inicialmente delay aquí
-    delay();
-    led_red_toggle();
+
+    if(switch3_pressed()){
+      led_red_toggle();
+      delay();
+    }
     //delay();
   }
 
