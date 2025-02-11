@@ -15,10 +15,9 @@ void delay(void)
 void led_green_init()
 {
   // SIM->COPC
-  SIM->COPC |= SIM_COPC_COPT(0); //Se puede poner directamente SIM->COPC |= 0
+  SIM->COPC = 0;
 
   // SIM->SCGC5
-  //SIM->SCGC5 |= SIM_SCGC5_PORTD(1);
   SIM->SCGC5 |= SIM_SCGC5_PORTD(1);
 
   // PORTD->PCR[5]
@@ -28,20 +27,19 @@ void led_green_init()
   GPIOD->PDDR |= GPIO_PDDR_PDD(1 << 5); //Hace que el pin 5 del puerto D sea de salida (1)
 
   // GPIOD->PSOR
-  GPIOD->PSOR |= GPIO_PSOR_PTSO(1 << 5);
+  GPIOD->PSOR |= GPIO_PSOR_PTSO(1 << 5); //PTSO setea el registro PDOR a 1
 }
 
 void led_green_toggle()
 {
   //
-    GPIOD->PTOR |= GPIO_PTOR_PTTO(1 << 5);
+    GPIOD->PTOR |= GPIO_PTOR_PTTO(1 << 5); //PTOR hace toggle al valor del registro PTSO (1 -> 0 y 0 -> 1)
 }
 
 // LED_RED = PTE29
 void led_red_init()
 {
 
-  //SIM->SCGC5 |= SIM_SCGC5_PORTE(1);
   SIM->SCGC5 |= SIM_SCGC5_PORTE(1);
 
   PORTE->PCR[29] |= PORT_PCR_MUX(1);
@@ -77,7 +75,7 @@ int switch1_pressed(void){
 
 //SWITCH3= PTC12
 void switch3_init(void){
-    SIM->SCGC5 |= SIM_SCGC5_PORTC(1); //entiendo que solo hace falta inicializarlo una vez (en button_green_init)
+    SIM->SCGC5 |= SIM_SCGC5_PORTC(1); //entiendo que solo hace falta inicializarlo una vez (en switch1_init)
 
     PORTC->PCR[12] |= PORT_PCR_MUX(1);
 
@@ -105,13 +103,13 @@ int main(void)
 
     if(switch1_pressed()){
       led_green_toggle();
-      delay();
+      while(switch1_pressed()); //Espera a que se deje de pulsar el botón para continuar
     }
     //Inicialmente delay aquí
 
     if(switch3_pressed()){
       led_red_toggle();
-      delay();
+      while(switch3_pressed()); //Espera a que se deje de pulsar el botón para continuar
     }
     //delay();
   }
