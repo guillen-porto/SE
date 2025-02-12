@@ -1,20 +1,32 @@
-main.elf:
-	arm-none-eabi-gcc -I ./includes -O2 -Wall -mthumb -mcpu=cortex-m0plus -c -o startup.o startup.c
-	
-	arm-none-eabi-gcc -I ./includes -O2 -Wall -mthumb -mcpu=cortex-m0plus -c -o main.o main.c
+TARGETS = main.elf debug.elf
 
-	arm-none-eabi-gcc -O2 -Wall -mthumb -mcpu=cortex-m0plus --specs=nano.specs -Wl,--gc-sections,-Map=main.map -T link.ld main.o startup.o -o main.elf
+all: $(TARGETS)
 
-compile_debug:
-	arm-none-eabi-gcc -I ./includes -O0 -g3 -Wall -mthumb -mcpu=cortex-m0plus -c -o startup.o startup.c
-	
-	arm-none-eabi-gcc -I ./includes -O0 -g3 -Wall -mthumb -mcpu=cortex-m0plus -c -o main.o main.c
 
-	arm-none-eabi-gcc -O0 -Wall -mthumb -mcpu=cortex-m0plus --specs=nano.specs -Wl,--gc-sections,-Map=main.map -T link.ld main.o startup.o -o main.elf
+CC = arm-none-eabi-gcc
+CFLAGS = -I ./includes -mthumb -mcpu=cortex-m0plus
+LDFLAGS = -O2 -Wall -mthumb -mcpu=cortex-m0plus --specs=nano.specs -Wl,--gc-sections,-Map=main.map -T link.ld
+SRCS = main.c startup.c
+OBJS = $(SRCS:.c=.o)
+OBJS_DBG = $(SRCS:.c=_dbg.o)
+
+
+%.o: %.c
+	$(CC) $(CFLAGS) -O2 -c $<
+
+%_dbg.o: %.c
+	$(CC) $(CFLAGS) -g -O0 -c -o $@ $<
+
+main.elf: $(OBJS)
+
+debug.elf: $(OBJS_DBG)
+
+$(TARGETS):
+	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 
 flash: main.elf
-	openocd -f openocd.cfg -c "program main.elf verify reset exit"
+	openocd -f openocd.cfg -c "program $^ verify reset exit"
 
 
 clean: 
@@ -22,4 +34,4 @@ clean:
 
 
 mrproper:
-	$(RM) *.o main.elf
+	$(RM) *.o *.elf
