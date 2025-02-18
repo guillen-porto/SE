@@ -63,7 +63,7 @@ void switch1_init(void){
 
     PORTC->PCR[3] |= PORT_PCR_PE(1); //Pull enable
 
-    PORTC->PCR[12] |= PORT_PCR_PS(1); //Pull up
+    PORTC->PCR[3] |= PORT_PCR_PS(1); //Pull up
 
     GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 3)); //Hace que el pin 3 del puerto C sea de entrada (0)
 

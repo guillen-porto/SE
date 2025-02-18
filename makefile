@@ -33,5 +33,5 @@ clean:
 	$(RM) *.o
 
 
-mrproper:
+cleanall:
 	$(RM) *.o *.elf
