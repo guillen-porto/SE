@@ -4,6 +4,14 @@
 // LED_GREEN = PTD5
 // LED_RED = PTE29
 
+int state = 0; //Realmente solo se necesitarían dos bits para el estado (los dos últimos de esta variable).
+/*
+00 -> P1 y P2 cerradas
+01 -> P1 cerrada, P2 abierta
+10 -> P1 abierta, P2 cerrada
+11 -> P1 y P2 abiertas
+*/
+
 void delay(void)
 {
   volatile int i;
@@ -27,7 +35,7 @@ void led_green_init()
   GPIOD->PDDR |= GPIO_PDDR_PDD(1 << 5); //Hace que el pin 5 del puerto D sea de salida (1)
 
   // GPIOD->PSOR
-  GPIOD->PSOR |= GPIO_PSOR_PTSO(1 << 5); //PTSO setea el registro PDOR a 1
+  GPIOD->PCOR |= GPIO_PSOR_PTSO(1 << 5); //PTSO setea el registro PDOR a 0 -> Enciende el led verde
 }
 
 void led_green_toggle()
@@ -46,7 +54,7 @@ void led_red_init()
 
   GPIOE->PDDR |= GPIO_PDDR_PDD(1 << 29); //Hace que el pin 29 del puerto E sea de salida (1)
 
-  GPIOE->PSOR |= GPIO_PSOR_PTSO(1 << 29);
+  GPIOE->PSOR |= GPIO_PSOR_PTSO(1 << 29); //Apaga el led rojo
 }
 
 void led_red_toggle(void)
@@ -69,12 +77,8 @@ void switch1_init(void){
 
 }
 
-int switch1_pressed(void){
-    return (GPIOC->PDIR & (1 << 3)) == 0;
-}
-
 //SWITCH3= PTC12
-void switch3_init(void){
+void switch2_init(void){
     SIM->SCGC5 |= SIM_SCGC5_PORTC(1); //entiendo que solo hace falta inicializarlo una vez (en switch1_init)
 
     PORTC->PCR[12] |= PORT_PCR_MUX(1);
@@ -86,9 +90,39 @@ void switch3_init(void){
     GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 12)); //Hace que el pin 12 del puerto C sea de entrada (0)
 }
 
-int switch3_pressed(void){
-    return (GPIOC->PDIR & (1 << 12)) == 0;
+
+int switch1_pressed(void){
+  return (GPIOC->PDIR & (1 << 3)) == 0;
 }
+
+
+int switch2_pressed(void){
+  return (GPIOC->PDIR & (1 << 12)) == 0;
+}
+
+
+//Funciones de modificación de estado
+
+//Un xor con un bit a 1 y el resto a 0 modifica el valor del bit que coincide con el 1 y deja el resto iguales
+void modify_door1_state(void){
+  state ^= (uint32_t)(1 << 1); //Se modifica el valor del penúltimo bit
+}
+
+void modify_door2_state(void){
+  state ^= (uint32_t)1;  //Se modifica el valor del último bit
+}
+
+void display_state(void){
+  if(state == 0){ //Estado seguro, encender verde y apagar rojo
+    GPIOD->PCOR |= GPIO_PSOR_PTSO(1 << 5);
+    GPIOE->PSOR |= GPIO_PSOR_PTSO(1 << 29); 
+  }
+  else{ //Estado inseguro, encender rojo y apagar verde
+    GPIOD->PSOR |= GPIO_PSOR_PTSO(1 << 5); 
+    GPIOE->PCOR |= GPIO_PSOR_PTSO(1 << 29); 
+  }
+}
+
 
 
 int main(void)
@@ -97,21 +131,22 @@ int main(void)
   led_red_init();
 
   switch1_init();
-  switch3_init();
+  switch2_init();
 
   while (1) {
 
+    if(switch2_pressed()){
+      modify_door2_state();
+      display_state();
+      while(switch2_pressed()); //Espera a que se deje de pulsar el botón para continuar
+    }
+
     if(switch1_pressed()){
-      led_green_toggle();
+      modify_door1_state();
+      display_state();
       while(switch1_pressed()); //Espera a que se deje de pulsar el botón para continuar
     }
-    //Inicialmente delay aquí
 
-    if(switch3_pressed()){
-      led_red_toggle();
-      while(switch3_pressed()); //Espera a que se deje de pulsar el botón para continuar
-    }
-    //delay();
   }
 
   return 0;
