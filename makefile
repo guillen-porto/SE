@@ -4,20 +4,21 @@ all: $(TARGETS)
 
 
 CC = arm-none-eabi-gcc
-CFLAGS = -I ./includes -mthumb -mcpu=cortex-m0plus
-LDFLAGS = -O2 -Wall -mthumb -mcpu=cortex-m0plus --specs=nano.specs -Wl,--gc-sections,-Map=main.map -T link.ld
+CFLAGS = -I ./includes -mthumb -mcpu=cortex-m0plus -O2 -g -O0 
+CFLAGS_DBG = -I ./includes -mthumb -mcpu=cortex-m0plus
+LDFLAGS = -Wall -mthumb -mcpu=cortex-m0plus --specs=nano.specs -Wl,--gc-sections,-Map=main.map -T link.ld
 SRCS = main.c startup.c
 OBJS = $(SRCS:.c=.o)
 OBJS_DBG = $(SRCS:.c=_dbg.o)
 
 
-%.o: %.c
-	$(CC) $(CFLAGS) -O2 -c $<
+#%.o: %.c
 
 %_dbg.o: %.c
-	$(CC) $(CFLAGS) -g -O0 -c -o $@ $<
-
+	$(CC) $(CFLAGS_DBG) -c -o $@ $<
+	
 main.elf: $(OBJS)
+
 
 debug.elf: $(OBJS_DBG)
 
