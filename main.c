@@ -104,12 +104,8 @@ int switch2_pressed(void){
 //Funciones de modificación de estado
 
 //Un xor con un bit a 1 y el resto a 0 modifica el valor del bit que coincide con el 1 y deja el resto iguales
-void modify_door1_state(void){
-  state ^= (uint32_t)(1 << 1); //Se modifica el valor del penúltimo bit
-}
-
-void modify_door2_state(void){
-  state ^= (uint32_t)1;  //Se modifica el valor del último bit
+void modify_door_state(int door){
+  state ^= (uint32_t)(1 << door); //El desplazamiento indica la puerta que se modifica (último bit es puerta 1 (0) y penúltimo es puerta 2 (1))
 }
 
 void display_state(void){
@@ -136,13 +132,13 @@ int main(void)
   while (1) {
 
     if(switch2_pressed()){
-      modify_door2_state();
+      modify_door_state(1);
       display_state();
       while(switch2_pressed()); //Espera a que se deje de pulsar el botón para continuar
     }
 
     if(switch1_pressed()){
-      modify_door1_state();
+      modify_door_state(0);
       display_state();
       while(switch1_pressed()); //Espera a que se deje de pulsar el botón para continuar
     }
