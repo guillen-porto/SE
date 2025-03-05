@@ -30,3 +30,8 @@
 *.hex
 *.bin
 *.srec
+
+
+
+#Vscode generated files
+.vscode
