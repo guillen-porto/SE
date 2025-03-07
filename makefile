@@ -1,8 +1,8 @@
 CC = arm-none-eabi-gcc
-CFLAGS = -I ./includes -I ./drivers -D CPU_MKL46Z256VLL4 -mthumb -mcpu=cortex-m0plus -O2
-LDFLAGS = -Wall -mthumb -mcpu=cortex-m0plus --specs=nano.specs -Wl,--gc-sections,-Map=main.map -T link.ld
+CFLAGS = -I ./includes -I ./drivers -Wall -O2 -mthumb -mcpu=cortex-m0plus -D CPU_MKL46Z256VLL4
+LDFLAGS = -O2 -Wall -mthumb -mcpu=cortex-m0plus --specs=nano.specs -Wl,--gc-sections,-Map=main.map -T link.ld
 
-COMMON_SRCS = $(wildcard drivers/*.c) board.c clock_config.c startup.c
+COMMON_SRCS = startup.c $(wildcard drivers/*.c) board.c clock_config.c
 COMMON_OBJS = $(COMMON_SRCS:.c=.o)
 	
 
@@ -24,7 +24,7 @@ flash_led: led_blinky.elf
 	openocd -f openocd.cfg -c "program $^ verify reset exit"
 
 clean: 
-	$(RM) *.o
+	$(RM) *.o drivers/*.o
 
 cleanall:
-	$(RM) *.o *.elf
+	$(RM) *.o *drivers/*.o .elf *.map
