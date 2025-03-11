@@ -1,6 +1,7 @@
 //*****************************************************************************
 // Declaration of the default fault handlers
 //*****************************************************************************
+#include "MKL46Z4.h"
 
 #define WEAK __attribute__ ((weak))
 
@@ -161,6 +162,7 @@ void Default_ResetHandler(void)
     }
 
   /* call the application's entry point */
+  SIM->COPC = 0; //Desactivamos watchdog
   main();
 }
 

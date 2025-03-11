@@ -53,7 +53,7 @@ volatile uint32_t g_systickCounter;
 /*******************************************************************************
  * Code
  ******************************************************************************/
-void SysTickIntHandler(void)
+void SysTickIntHandler(void) //Cambiado nombre para que se corresponda con el del startup.c
 {
     if (g_systickCounter != 0U)
     { 
