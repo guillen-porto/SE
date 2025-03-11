@@ -30,3 +30,6 @@
 *.hex
 *.bin
 *.srec
+
+#vscode file
+.vscode
