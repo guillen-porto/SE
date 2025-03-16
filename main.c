@@ -191,9 +191,13 @@ int main(void)
   NVIC_DisableIRQ(PORTC_PORTD_IRQn); //Game ended, disable interruptions for the switches
   // [...]
   //
+
+  LCD->AR |= LCD_AR_BLINK(1) | LCD_AR_BRATE(2); //Make the LCD start blinking
   while (1) {
     lcd_display_time(hits, misses);
   }
+
+  LCD->AR |= LCD_AR_BLINK(0); //Make the LCD stop blinking
 
   return 0;
 }
