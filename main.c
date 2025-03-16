@@ -11,6 +11,15 @@
 
 // Enable IRCLK (Internal Reference Clock)
 // see Chapter 24 in MCU doc
+
+volatile int button_pressed = 0; //Variable that indicates that a button has been pressed (1)
+
+int currentState = 0; //State of the led, 0 means red is turned on and 1 means green is turned on
+
+int hits = 0; //Number of correct presses
+int misses = 0; //Number of wrong presses
+
+
 void irclk_ini()
 {
   MCG->C1 = MCG_C1_IRCLKEN(1) | MCG_C1_IREFSTEN(1);
@@ -64,7 +73,8 @@ void led_green_clear()
 
 //Right switch
 void right_switch_init(void){
-  SIM->SCGC5 |= SIM_SCGC5_PORTC(1);
+  SIM->SCGC5 |= SIM_SCGC5_PORTC(1); //Enable port C4
+
 
   PORTC->PCR[3] |= PORT_PCR_MUX(1); //Set as GPIO
 
@@ -72,12 +82,15 @@ void right_switch_init(void){
 
   PORTC->PCR[3] |= PORT_PCR_PS(1); //Pull up
 
-  GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 3)); //Hace que el pin 3 del puerto C sea de entrada (0)
+  GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 3)); //Sets pin 3 of port c as input(0)
 
+  PORTC->PCR[3] |= PORT_PCR_IRQC(10); //10 (1010): Interrupt on falling edge (when buttoon is pressed) 
 }
 
 //Left switch
 void left_switch_init(void){
+
+  SIM->SCGC5 |= SIM_SCGC5_PORTC(1); //Enable port C4 (probably not needed)
 
   PORTC->PCR[12] |= PORT_PCR_MUX(1); //Set as GPIO
 
@@ -85,7 +98,9 @@ void left_switch_init(void){
 
   PORTC->PCR[12] |= PORT_PCR_PS(1); //Pull up
 
-  GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 12)); //Hace que el pin 12 del puerto C sea de entrada (0)
+  GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 12)); //Sets pin 12 of port c as input(0)
+
+  PORTC->PCR[3] |= PORT_PCR_IRQC(10); //10 (1010): Interrupt on falling edge (when buttoon is pressed) 
 }
 
 
@@ -93,19 +108,30 @@ void left_switch_init(void){
 //Port C and D interrupt handler:
 void PORTDIntHandler(void) {
   
-  if (PORTC->ISFR & (1 << 3)) { //Left switch pressed
+  if (PORTC->ISFR & (1 << 3)) { //Right switch pressed
       PORTC->ISFR |= (1 << 3);  // Clear interrupt flag
 
-      // Action for button on PTC3 (e.g., toggle LED on PTD5)
-      PTD->PTOR = (1 << 5);
+      if(currentState == 1){ //Correct if led is currently green
+        hits ++;
+      }
+      else{
+        misses ++;
+      }
+      button_pressed = 1;
+      
   }
 
-  // Check if PTC12 caused the interrupt
-  if (PORTC->ISFR & (1 << 12)) {
+  if (PORTC->ISFR & (1 << 12)) { //Left switch presssed
       PORTC->ISFR |= (1 << 12);  // Clear interrupt flag
+   
+      if(currentState == 0){ //Correct if led is currently red
+        hits ++;
+      }
+      else{
+        misses ++;
+      }
 
-      // Action for button on PTC12 (e.g., toggle LED on PTE29)
-      PTE->PTOR = (1 << 29);
+      button_pressed = 1;
   }
 }
 
@@ -122,7 +148,7 @@ int main(void)
   irclk_ini(); // Enable internal ref clk to use by LCD
 
   lcd_ini();
-  lcd_display_dec(666);
+  lcd_display_time(0, 0);
 
   SIM->COPC = 0; //Disable Watchdog
 
@@ -131,39 +157,46 @@ int main(void)
   led_red_init();
 
   //Enable switches
-  left_switch_init();
   right_switch_init();
-  NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Enable the interruption for the switches
+  left_switch_init();
 
   // 'Random' sequence :-)
   volatile unsigned int sequence = 0x32B14D98,
     index = 0;
 
+  NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Game starts, enable interruptions for the switches
+
   while (index < 32) {
+    button_pressed = 0; //Reset the button_pressed variable
     if (sequence & (1 << index)) { //odd
       
       // Switch on green led
+      currentState = 1;
       led_green_set();
-      delay();
-      led_green_clear();
-      //
-    } else { //even
-      //
-      // Switch on red led
-      led_red_set();
-      delay();
-      led_red_clear();
-      // [...]
-      //
-    }
-    // [...]
-  }
 
-  // Stop game and show blinking final result in LCD: hits:misses
+      while(!button_pressed); //Wait until a button is pressed to clear the led and go to the next iteration
+
+      led_green_clear();
+
+    } else { //even
+
+      // Switch on red led
+      currentState = 0;
+      led_red_set();
+      while(!button_pressed); //Wait until a button is pressed to clear the led and go to the next iteration
+      led_red_clear();
+
+    }
+
+    lcd_display_time(hits, misses); //Displays hist:misses
+    index ++; //Go to next number in sequence
+  }
+  NVIC_DisableIRQ(PORTC_PORTD_IRQn); //Game ended, disable interruptions for the switches
   // [...]
   //
-
   while (1) {
+    delay();
+    lcd_display_time(hits, misses);
   }
 
   return 0;
