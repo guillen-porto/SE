@@ -20,17 +20,31 @@ void delay(int mult)
 
 int main(void){
 
-    irclk_ini();
-    lcd_ini();
+    //Displ is the number of bits that this is displaced.
+    //With displ = 16, number 0xn would be 0xn0000
+    //This is to test if it works in different possible positions
+    for(int displ = 0; displ <= 16; displ += 4){
 
-    unsigned int original = 0xA690;
-    unsigned int reversed;
-    unsigned int displayed;
+        //Original and reverse numbers
+        unsigned int original = 0x9F06 << displ; 
+        unsigned int reversed;
 
-    reversed = reverse_int(original);
-    displayed = reversed >> 16; //First 4 hex digits of reversed (first 16 bits of the 32)
+        //Numbers that will be displayed by the lcd
+        unsigned int displayed_orig;
+        unsigned int displayed_rev;
 
-    lcd_display_hex(original);
-    delay(2); //Double delay
-    lcd_display_hex(displayed);
+        irclk_ini();
+        lcd_ini();
+
+        reversed = reverse_int(original);
+
+        //The lcd should display the same thing in all iterations -> displace numbers based on displ
+        displayed_orig = original >> displ;
+        displayed_rev = reversed >> (16 - displ);
+
+        lcd_display_hex(displayed_orig);
+        delay(4); //Quadruple delay (could make this with a button press to have more control)
+        lcd_display_hex(displayed_rev);
+        delay(4);
+    }
 }
