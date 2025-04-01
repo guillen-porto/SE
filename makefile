@@ -14,9 +14,12 @@ ORIG_OBJS := $(ORIG_OBJS:.s=.o) #Añade los objetos creados a partir de ficheros
 OPT_SRCS = reverse_int_opt.s $(COMMON_SRCS)
 OPT_OBJS = $(OPT_SRCS:.c=.o)
 OPT_OBJS := $(OPT_OBJS:.s=.o)
+
+OPT_INL_SRCS = reverse_int_opt_inl.c $(COMMON_SRCS)
+OPT_INL_OBJS = $(OPT_INL_SRCS:.c=.o)
 	
 #all: Genera los ejecutables para todas las versiones
-all: main_orig.elf main_opt.elf
+all: main_orig.elf main_opt.elf main_opt_inl.elf
 
 #Crea el ejecutable para la versión sin optimizar
 main_orig.elf: $(ORIG_OBJS)
@@ -26,10 +29,15 @@ main_orig.elf: $(ORIG_OBJS)
 main_opt.elf: $(OPT_OBJS)
 	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
+#Crea el ejecutable para la versión optimizada con código ensamblador inline
+main_opt_inl.elf: $(OPT_INL_OBJS)
+	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
+
 #Regla general para compilar archivos .c
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+#Regla general para compilar archivos en ensamblador
 %.o: %.s
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -40,6 +48,11 @@ flash_orig: main_orig.elf
 
 #Flashea el programa optimizado con código ensamblador aparte
 flash_opt: main_opt.elf
+	openocd -f openocd.cfg -c "program $^ verify reset exit"
+
+
+#Flashea el programa optimizado con código ensamblador inline
+flash_opt_inl: main_opt_inl.elf
 	openocd -f openocd.cfg -c "program $^ verify reset exit"
 
 #clean: Elimina los ficheros .o (incluye explícitamente los de drivers)

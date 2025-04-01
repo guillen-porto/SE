@@ -26,7 +26,7 @@ int main(void){
     for(int displ = 0; displ <= 16; displ += 4){
 
         //Original and reverse numbers
-        unsigned int original = 0x6F09 << displ; 
+        unsigned int original = 0x7F09 << displ; 
         unsigned int reversed;
 
         //Numbers that will be displayed by the lcd

@@ -8,7 +8,7 @@
 	.eabi_attribute 30, 2
 	.eabi_attribute 34, 0
 	.eabi_attribute 18, 4
-	.file	"main_orig.c"
+	.file	"reverse_int_orig.c"
 	.text
 	.align	1
 	.p2align 2,,3
