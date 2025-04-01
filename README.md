@@ -1,4 +1,4 @@
-# Práctica 3 - SE 24/25
+# Práctica 4 - SE 24/25
 
 Implementa un pequeno xogo coa placa: o xogo consiste en que o usuario
 ten que premer no botón correspondente ao LED que a placa teña acendido
