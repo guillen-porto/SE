@@ -9,9 +9,11 @@ COMMON_SRCS = startup.c $(wildcard drivers/*.c) main.c
 
 ORIG_SRCS = reverse_int_orig.s $(COMMON_SRCS)
 ORIG_OBJS = $(ORIG_SRCS:.c=.o)
+ORIG_OBJS := $(ORIG_OBJS:.s=.o) #Añade los objetos creados a partir de ficheros .s
 
-OPT_SRCS = reverse_int.s$(COMMON_SRCS)
+OPT_SRCS = reverse_int_opt.s $(COMMON_SRCS)
 OPT_OBJS = $(OPT_SRCS:.c=.o)
+OPT_OBJS := $(OPT_OBJS:.s=.o)
 	
 #all: Genera los ejecutables para todas las versiones
 all: main_orig.elf main_opt.elf
@@ -21,7 +23,7 @@ main_orig.elf: $(ORIG_OBJS)
 	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
 #Crea el ejecutable para la versión optimizada con código ensamblador aparte
-main_opt.elf: $(ORIG_OBJS)
+main_opt.elf: $(OPT_OBJS)
 	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
 #Regla general para compilar archivos .c

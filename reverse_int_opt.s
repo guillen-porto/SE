@@ -33,6 +33,8 @@ reverse_int:
 	lsrs	r3, r3, #1
 	cmp	r2, #0
 	bne	.L2
+	movs	r1, #1
+	ands	r1, r3
 	orrs	r0, r1
 	@ sp needed
 	pop	{pc}

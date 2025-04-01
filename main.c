@@ -26,7 +26,7 @@ int main(void){
     for(int displ = 0; displ <= 16; displ += 4){
 
         //Original and reverse numbers
-        unsigned int original = 0x9F06 << displ; 
+        unsigned int original = 0x6F09 << displ; 
         unsigned int reversed;
 
         //Numbers that will be displayed by the lcd
@@ -43,8 +43,8 @@ int main(void){
         displayed_rev = reversed >> (16 - displ);
 
         lcd_display_hex(displayed_orig);
-        delay(4); //Quadruple delay (could make this with a button press to have more control)
+        delay(3); //Triple delay (could make this with a button press to have more control)
         lcd_display_hex(displayed_rev);
-        delay(4);
+        delay(3);
     }
 }
