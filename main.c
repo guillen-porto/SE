@@ -22,7 +22,7 @@ int main(void){
 
     //Displ is the number of bits that this is displaced.
     //With displ = 16, number 0xn would be 0xn0000
-    //This is to test if it works in different possible positions
+    //This is to test if it works in different possible positions (you can actually just test with displ 0 and 16)
     for(int displ = 0; displ <= 16; displ += 4){
 
         //Original and reverse numbers
