@@ -28,4 +28,4 @@ clean:
 
 #cleanall: elimina ficheros .o (incluidos los de drivers), .elf y .map 
 cleanall:
-	$(RM) *.o *drivers/*.o .elf *.map
+	$(RM) *.o *drivers/*.o *.elf *.map
