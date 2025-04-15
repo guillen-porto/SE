@@ -319,6 +319,20 @@ void lcd_set(uint8_t value, uint8_t digit)
 }
 
 
+void lcd_clear(uint8_t digit){
+  if (digit > 4) {
+    //Display "Err" if trying to access a digit that does not exist
+    lcd_display_error(0x01);
+
+    return;
+  }
+  //Set all values to 0
+  LCD->WF8B[LCD_Frontplane_Pin[(2*digit)-2]] = LCD_CLEAR;
+  LCD->WF8B[LCD_Frontplane_Pin[(2*digit)-1]] = LCD_CLEAR;
+
+}
+
+
 //
 // Displays a 4 Digit number in decimal
 //

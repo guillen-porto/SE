@@ -184,13 +184,26 @@ int main(void)
   right_switch_init();
   left_switch_init();
 
+  NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Count ended. Disable buttons
+
+  //Set and clear the corresponding digits to simulate blinking, this indicates to user which number they will change
   while(currentState == 0){
-    //Interruptions control the count variable here
+    lcd_clear(3);
+    lcd_clear(4);
+    delay();
+    lcd_display_time(alarm, count);
+    delay();
   }
 
   while (currentState == 1){
-
+    lcd_clear(1);
+    lcd_clear(2);
+    delay();
+    lcd_display_time(alarm, count);
+    delay();
   }
+
+  //Loop where the count will diminish
   while (count > 0){
 
   }  

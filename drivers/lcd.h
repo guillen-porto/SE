@@ -7,6 +7,7 @@
 
 void lcd_ini(void);
 void lcd_set(uint8_t value, uint8_t digit);
+void lcd_clear(uint8_t digit);
 void lcd_display_dec(uint16_t value);
 void lcd_display_hex(uint16_t value);
 void lcd_display_time(uint8_t value1, uint8_t value2);
