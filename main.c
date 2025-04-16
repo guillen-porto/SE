@@ -205,15 +205,22 @@ int main(void)
 
   //Loop where the count will diminish
   while (count > 0){
-
+    lcd_display_time(alarm, count--);
+    delay();
   }  
   
 
   NVIC_DisableIRQ(PORTC_PORTD_IRQn); //Count ended. Disable buttons
 
-  LCD->AR |= LCD_AR_BLINK(1) | LCD_AR_BRATE(2); //Make the LCD start blinking
+  //Make last number blink again
+  while(1){
+    lcd_clear(3);
+    lcd_clear(4);
+    delay();
+    lcd_display_time(alarm, count);
+    delay();
+  }
 
-  LCD->AR |= LCD_AR_BLINK(0); //Make the LCD stop blinking
 
   return 0;
 }
