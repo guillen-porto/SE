@@ -124,6 +124,30 @@ void left_switch_init(void){
 }
 
 
+//TPM CLOCK
+void tpm_clock_init(void){
+
+  SIM->SCGC6 |= SIM_SCGC6_TPM0(1); //Activate TPM0 clock
+  SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1); //Source: MCGFLLCLK
+  SIM->SOPT2 |= SIM_SOPT2_PLLFLLSEL(1); //Divide freq of MCGFLLCLK by 2
+
+  //TPM0->CNT |= TPM_CNT_COUNT(0); //Initialize count (recommended to do it before setting mod, page 568)
+  TPM0->SC |= TPM_SC_CPWMS(0); //Sets the mode to up-counting
+  TPM0->SC |= TPM_SC_TOIE(1); //Enables interrupts for the TPM 0 clock
+  TPM0->SC |= TPM_SC_CMOD(1);
+
+  TPM0->SC |= TPM_SC_PS(7); //7 -> Prescaler = 128, highest possible value
+  TPM0->MOD |= TPM_MOD_MOD(62499); //Biggest number lower than 65535 (max mod value) that makes a second equal a whole number of interruptions
+
+  NVIC_EnableIRQ(TPM0_IRQn);
+}
+
+
+//TPM0 interrupt handler:
+void FTM0IntHandler(void){
+
+}
+
 
 //Port C and D interrupt handler:
 void PORTDIntHandler(void) {
@@ -150,7 +174,7 @@ void PORTDIntHandler(void) {
             lcd_display_time(alarm, count); //Display alarm and count as a time (alarm:count)
             break;
         case STATE_COUNTING:
-            paused = !paused;
+            paused = !paused; //Pauses or unpauses the count
             break;
       
       default:
@@ -203,10 +227,10 @@ int main(void)
     delay();
   }
 
+  tpm_clock_init();
+
   //Loop where the count will diminish
   while (count > 0){
-    lcd_display_time(alarm, count--);
-    delay();
   }  
   
 
