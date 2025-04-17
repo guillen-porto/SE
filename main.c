@@ -25,10 +25,10 @@ volatile int button_pressed = 0; //Variable that indicates that a button has bee
 
 ProgramState currentState = STATE_SET_COUNT; //Current state of the program
 
-int count = 0; //Current count on the timer
+volatile int count = 0; //Current count on the timer (volatile for the loop)
 int alarm = 0; //Value of count when the "alarm" will start
 
-int paused = 0; //Indicates if the count is currently paused
+int clock_running = 1; //Indicates if the count is currently running (1) or paused (0)
 
 
 void irclk_ini()
@@ -130,13 +130,12 @@ void tpm_clock_init(void){
   SIM->SCGC6 |= SIM_SCGC6_TPM0(1); //Activate TPM0 clock
   SIM->SOPT2 |= SIM_SOPT2_TPMSRC(3); //Source: MCGIRCLK (already activated)
 
-  //TPM0->CNT |= TPM_CNT_COUNT(0); //Initialize count (recommended to do it before setting mod, page 568)
+  TPM0->SC |= TPM_SC_PS(7); //7 -> Prescaler = 128, highest possible value
   TPM0->SC |= TPM_SC_CPWMS(0); //Sets the mode to up-counting
   TPM0->SC |= TPM_SC_TOIE(1); //Enables interrupts for the TPM 0 clock
   TPM0->SC |= TPM_SC_CMOD(1); //Enables TPM counter
 
-  TPM0->SC |= TPM_SC_PS(7); //7 -> Prescaler = 128, highest possible value
-  TPM0->MOD |= TPM_MOD_MOD(255); //Mod needed to have a final frequency of 1 Hz (explained in readme)
+  TPM0->MOD = 255; //Mod needed to have a final frequency of 1 Hz (explained in readme)
 
   NVIC_EnableIRQ(TPM0_IRQn);
 }
@@ -144,24 +143,17 @@ void tpm_clock_init(void){
 
 //TPM0 interrupt handler:
 void FTM0IntHandler(void){
-  TPM0->SC |= TPM_SC_TOF(0);
-
-  if (currentState == STATE_COUNTING && !paused) {
+  TPM0->SC |= TPM_SC_TOF(1);
+    
       if (count > 0) {
           count--;
           lcd_display_time(alarm, count);
       }
 
-      if (count <= alarm) {  // Alarm
-          led_green_toggle();
-          led_red_toggle();
+      if(count <= alarm){ //Blink in case count is lower than alarm
+        led_green_toggle();
+        led_red_toggle();
       }
-
-      if (count == 0) {
-          // Stop the timer if desired
-          TPM0->SC &= ~TPM_SC_TOIE_MASK; // disable timer interrupt
-      }
-  }
 }
 
 
@@ -190,7 +182,8 @@ void PORTDIntHandler(void) {
             lcd_display_time(alarm, count); //Display alarm and count as a time (alarm:count)
             break;
         case STATE_COUNTING:
-            paused = !paused; //Pauses or unpauses the count
+            clock_running = !clock_running;
+            TPM0->SC = (TPM0->SC & ~TPM_SC_CMOD_MASK) | TPM_SC_CMOD(clock_running); //Enables or disables the count
             break;
       
       default:
@@ -248,14 +241,15 @@ int main(void)
 
   //Loop where the count will diminish
   while (count > 0){
+    __WFI();
   }  
   
 
   NVIC_DisableIRQ(PORTC_PORTD_IRQn); //Count ended. Disable buttons
   NVIC_DisableIRQ(TPM0_IRQn);  //Count ended, disable interrupts
 
-  led_green_clear();
-  led_red_clear(); //Clear leds in case they're on
+  led_green_set();
+  led_red_set(); //Turn leds off in case they're on
 
   //Make last number blink again
   while(1){
