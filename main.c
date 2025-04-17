@@ -175,10 +175,12 @@ void PORTDIntHandler(void) {
       switch (currentState){
         case STATE_SET_COUNT:
             count ++;
+            count %= 100;
             lcd_display_time(alarm, count); //Display alarm and count as a time (alarm:count)
             break;
         case STATE_SET_ALARM:
             alarm ++;
+            alarm %= 100;
             lcd_display_time(alarm, count); //Display alarm and count as a time (alarm:count)
             break;
         case STATE_COUNTING:
@@ -220,8 +222,8 @@ int main(void)
 
   NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Count ended. Disable buttons
 
-  //Set and clear the corresponding digits to simulate blinking, this indicates to user which number they will change
-  while(currentState == 0){
+  //Set and clear the corresponding digits to simulate blinking, this indicates to user which number they are modifying
+  while(currentState == STATE_SET_COUNT){
     lcd_clear(3);
     lcd_clear(4);
     delay();
@@ -229,7 +231,7 @@ int main(void)
     delay();
   }
 
-  while (currentState == 1){
+  while (currentState == STATE_SET_ALARM){
     lcd_clear(1);
     lcd_clear(2);
     delay();
@@ -237,16 +239,21 @@ int main(void)
     delay();
   }
 
+  if(alarm > count){
+    lcd_display_error(0x02);
+    return;
+  }
+
   tpm_clock_init();
 
   //Loop where the count will diminish
   while (count > 0){
-    __WFI();
+    __WFI(); //Wait for interruptions
   }  
-  
 
+  TPM0->SC = (TPM0->SC & ~TPM_SC_CMOD_MASK) | TPM_SC_CMOD(0);
   NVIC_DisableIRQ(PORTC_PORTD_IRQn); //Count ended. Disable buttons
-  NVIC_DisableIRQ(TPM0_IRQn);  //Count ended, disable interrupts
+  NVIC_DisableIRQ(TPM0_IRQn);  //Count ended, disable timer interrupts
 
   led_green_set();
   led_red_set(); //Turn leds off in case they're on
