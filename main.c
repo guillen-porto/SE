@@ -135,7 +135,7 @@ void tpm_clock_init(void){
   TPM0->SC |= TPM_SC_TOIE(1); //Enables interrupts for the TPM 0 clock
   TPM0->SC |= TPM_SC_CMOD(1); //Enables TPM counter
 
-  TPM0->MOD = 255; //Mod needed to have a final frequency of 1 Hz (explained in readme)
+  TPM0->MOD = 255; //Modulo needed for a final frequency of 1 Hz (explained in readme)
 
   NVIC_EnableIRQ(TPM0_IRQn);
 }
@@ -163,7 +163,7 @@ void PORTDIntHandler(void) {
   if (PORTC->ISFR & (1 << 3)) { //Right switch pressed -> Next state
       PORTC->ISFR |= (1 << 3);  // Clear interrupt flag
 
-      if(currentState <= STATE_SET_ALARM){ //
+      if(currentState < STATE_COUNTING){
         currentState ++; //Go to next state
       }
 
