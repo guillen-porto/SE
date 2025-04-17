@@ -128,16 +128,15 @@ void left_switch_init(void){
 void tpm_clock_init(void){
 
   SIM->SCGC6 |= SIM_SCGC6_TPM0(1); //Activate TPM0 clock
-  SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1); //Source: MCGFLLCLK
-  SIM->SOPT2 |= SIM_SOPT2_PLLFLLSEL(1); //Divide freq of MCGFLLCLK by 2
+  SIM->SOPT2 |= SIM_SOPT2_TPMSRC(3); //Source: MCGIRCLK (already activated)
 
   //TPM0->CNT |= TPM_CNT_COUNT(0); //Initialize count (recommended to do it before setting mod, page 568)
   TPM0->SC |= TPM_SC_CPWMS(0); //Sets the mode to up-counting
   TPM0->SC |= TPM_SC_TOIE(1); //Enables interrupts for the TPM 0 clock
-  TPM0->SC |= TPM_SC_CMOD(1);
+  TPM0->SC |= TPM_SC_CMOD(1); //Enables TPM counter
 
   TPM0->SC |= TPM_SC_PS(7); //7 -> Prescaler = 128, highest possible value
-  TPM0->MOD |= TPM_MOD_MOD(62499); //Biggest number lower than 65535 (max mod value) that makes a second equal a whole number of interruptions
+  TPM0->MOD |= TPM_MOD_MOD(255); //Mod needed to have a final frequency of 1 Hz (explained in readme)
 
   NVIC_EnableIRQ(TPM0_IRQn);
 }
@@ -145,7 +144,24 @@ void tpm_clock_init(void){
 
 //TPM0 interrupt handler:
 void FTM0IntHandler(void){
+  TPM0->SC |= TPM_SC_TOF(0);
 
+  if (currentState == STATE_COUNTING && !paused) {
+      if (count > 0) {
+          count--;
+          lcd_display_time(alarm, count);
+      }
+
+      if (count <= alarm) {  // Alarm
+          led_green_toggle();
+          led_red_toggle();
+      }
+
+      if (count == 0) {
+          // Stop the timer if desired
+          TPM0->SC &= ~TPM_SC_TOIE_MASK; // disable timer interrupt
+      }
+  }
 }
 
 
@@ -191,6 +207,7 @@ void delay(void)
   for (i = 0; i < 1000000; i++);
 }
 
+
 int main(void)
 {
   irclk_ini(); // Enable internal ref clk to use by LCD
@@ -235,6 +252,10 @@ int main(void)
   
 
   NVIC_DisableIRQ(PORTC_PORTD_IRQn); //Count ended. Disable buttons
+  NVIC_DisableIRQ(TPM0_IRQn);  //Count ended, disable interrupts
+
+  led_green_clear();
+  led_red_clear(); //Clear leds in case they're on
 
   //Make last number blink again
   while(1){
