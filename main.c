@@ -135,7 +135,7 @@ void tpm_clock_init(void){
   TPM0->SC |= TPM_SC_TOIE(1); //Enables interrupts for the TPM 0 clock
   TPM0->SC |= TPM_SC_CMOD(1); //Enables TPM counter
 
-  TPM0->MOD = 255; //Modulo needed for a final frequency of 1 Hz (explained in readme)
+  TPM0->MOD = 249; //Modulo needed for a final frequency of 1 Hz (explained in readme)
 
   NVIC_EnableIRQ(TPM0_IRQn);
 }
