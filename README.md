@@ -4,7 +4,7 @@ Este proyecto consiste en implementar un temporizador programable en la placa FR
 
 ## Funcionamiento del programa
 
-El programa inicia mostrándole al usuario los valores de cuenta y alarma en el LCD, en formato ALARMA : CUENTA.
+El programa inicia mostrándole al usuario los valores de cuenta y alarma en el LCD, en formato `ALARMA:CUENTA`.
 
 ### 1 - Configuración del valor del temporizador
 
