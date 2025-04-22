@@ -7,30 +7,37 @@ LDFLAGS = -O2 -Wall -mthumb -mcpu=cortex-m0plus --specs=nano.specs -Wl,--gc-sect
 #Archivos que se necesitan para la compilación de todas las versiones
 COMMON_SRCS = startup.c $(wildcard drivers/*.c) main.c
 
-ORIG_SRCS = reverse_int_orig.s $(COMMON_SRCS)
-ORIG_OBJS = $(ORIG_SRCS:.c=.o)
-ORIG_OBJS := $(ORIG_OBJS:.s=.o) #Añade los objetos creados a partir de ficheros .s
+SRCS1 = reverse1.c $(COMMON_SRCS)
+OBJS1 = $(SRCS1:.c=.o)
 
-OPT_SRCS = reverse_int_opt.s $(COMMON_SRCS)
-OPT_OBJS = $(OPT_SRCS:.c=.o)
-OPT_OBJS := $(OPT_OBJS:.s=.o)
+SRCS2 = reverse2.s $(COMMON_SRCS)
+OBJS2 = $(SRCS2:.c=.o)
+OBJS2 := $(OBJS2:.s=.o)
 
-OPT_INL_SRCS = reverse_int_opt_inl.c $(COMMON_SRCS)
-OPT_INL_OBJS = $(OPT_INL_SRCS:.c=.o)
+SRCS3 = reverse3.s $(COMMON_SRCS)
+OBJS3 = $(SRCS3:.c=.o)
+OBJS3 := $(OBJS3:.s=.o)
+
+SRCS4 = reverse4.c $(COMMON_SRCS)
+OBJS4 = $(SRCS4:.c=.o)
 	
 #all: Genera los ejecutables para todas las versiones
-all: main_orig.elf main_opt.elf main_opt_inl.elf
+all: main1.elf main2.elf main3.elf main4.elf
 
-#Crea el ejecutable para la versión sin optimizar
-main_orig.elf: $(ORIG_OBJS)
+#Crea el ejecutable para la versión en C inicial
+main1.elf: $(OBJS1)
 	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
-#Crea el ejecutable para la versión optimizada con código ensamblador aparte
-main_opt.elf: $(OPT_OBJS)
+#Crea el ejecutable para la versión en ensamblador inicial
+main2.elf: $(OBJS2)
 	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
-#Crea el ejecutable para la versión optimizada con código ensamblador inline
-main_opt_inl.elf: $(OPT_INL_OBJS)
+#Crea el ejecutable para la versión en ensamblador optimizada
+main3.elf: $(OBJS3)
+	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
+
+#Crea el ejecutable para la versión en C optimizada
+main4.elf: $(OBJS4)
 	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o $@
 
 #Regla general para compilar archivos .c
@@ -43,16 +50,20 @@ main_opt_inl.elf: $(OPT_INL_OBJS)
 
 
 #Flashea el programa original
-flash_orig: main_orig.elf
+flash_1: main1.elf
 	openocd -f openocd.cfg -c "program $^ verify reset exit"
 
 #Flashea el programa optimizado con código ensamblador aparte
-flash_opt: main_opt.elf
+flash_2: main2.elf
 	openocd -f openocd.cfg -c "program $^ verify reset exit"
 
 
 #Flashea el programa optimizado con código ensamblador inline
-flash_opt_inl: main_opt_inl.elf
+flash_3: main3.elf
+	openocd -f openocd.cfg -c "program $^ verify reset exit"
+
+#Flashea el programa optimizado con código ensamblador inline
+flash_4: main4.elf
 	openocd -f openocd.cfg -c "program $^ verify reset exit"
 
 #clean: Elimina los ficheros .o (incluye explícitamente los de drivers)
