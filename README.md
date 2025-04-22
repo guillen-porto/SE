@@ -45,5 +45,5 @@ Para obtener la frecuencia final de **1 Hz** a partir de la frecuencia del IRCLK
 
 - Para el valor del prescaler, utilicé el máximo posible **(128)**, ya que supuse que supondría un menor consumo que utilizar solo el módulo (ya que el prescaler reduce la frecuencia con la que se cuenta, mientras que el módulo solo aumenta el número hasta el que hay que contar para que suceda una interrupción).
 
-- Para el valor del módulo, tuve en cuenta que, en el modo ***up-counting*** del temporizador, el contador interno del TPM incrementa cíclicamente de 0 a **MOD**, haciendo que la frecuencia final siga la fórmula: $ f_{\text{final}} = \frac{f_{\text{clk}}}{\text{prescaler} \times (\text{MOD} + 1)} $, por lo que $ MOD = \frac{f_{\text{clk}}}{f_{\text{final}} \times \text{prescaler}} - 1 $.
-Sustituyendo en la anterior fórmula, se obtiene que $ MOD = \frac{32000}{{1} \times 128} - 1 = 250 - 1 = 249$.
+- Para el valor del módulo, tuve en cuenta que, en el modo ***up-counting*** del temporizador, el contador interno del TPM incrementa cíclicamente de 0 a **MOD**, haciendo que la frecuencia final siga la fórmula: f_final = f_clk / (prescaler × (MOD + 1)), por lo que MOD = (f_clk / (f_final × prescaler)) - 1.
+Sustituyendo en la anterior fórmula, se obtiene que MOD = (32000 / (1 × 128)) - 1 = 250 - 1 = 249
