@@ -149,11 +149,6 @@ void FTM0IntHandler(void){
           count--;
           lcd_display_time(alarm, count);
       }
-
-      if(count <= alarm){ //Blink in case count is lower than alarm
-        led_green_toggle();
-        led_red_toggle();
-      }
 }
 
 
@@ -239,17 +234,24 @@ int main(void)
     delay();
   }
 
-  if(alarm > count){
+  if(alarm > count){ //Display error if alarm is bigger than count
     lcd_display_error(0x02);
-    return;
+    return -1;
   }
 
   tpm_clock_init();
 
-  //Loop where the count will diminish
-  while (count > 0){
+  //The count will diminish until it reaches the alarm value
+  while (count > alarm){
     __WFI(); //Wait for interruptions
   }  
+
+  //When it reaches the alarm value, the leds start blinking
+  while (count > 0){
+    led_green_toggle();
+    led_red_toggle();
+    delay();
+  }
 
   TPM0->SC = (TPM0->SC & ~TPM_SC_CMOD_MASK) | TPM_SC_CMOD(0);
   NVIC_DisableIRQ(PORTC_PORTD_IRQn); //Count ended. Disable buttons
