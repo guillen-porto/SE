@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#include <stdlib.h>
 
 #define MAX_PRODUCERS 5
 #define MAX_CONSUMERS 5
@@ -57,34 +58,9 @@ void left_switch_init(void){
   PORTC->PCR[12] |= PORT_PCR_IRQC(10); //10 (1010): Interrupt on falling edge (when buttoon is pressed) 
 }
 
-
-
-//Port C and D interrupt handler:
-void PORTDIntHandler(void) {
-  
-  if (PORTC->ISFR & (1 << 3)) { //Right switch pressed -> Increase consumers
-      PORTC->ISFR |= (1 << 3);  // Clear interrupt flag
-      if(numConsumers < 5){
-        numConsumers ++;
-      }
-      else{
-        numConsumers = 0;
-      }
-
-  }
-
-  if (PORTC->ISFR & (1 << 12)) { //Left switch presssed -> Increase producers
-      PORTC->ISFR |= (1 << 12);  // Clear interrupt flag
-    
-      if(numProducers < 5){
-        numProducers ++;
-      }
-      else{
-        numProducers = 0;
-      }
-  }
-  uint8_t displayed = 10 * numProducers + numConsumers;
-}
+/*#################################
+########  TASK FUNCTIONS   ########
+#################################*/
 
 //Function that the producers will execute
 void addDataTask(void *pvParameters){
@@ -105,7 +81,6 @@ void removeDataTask(void *pvParameters){
   while(1){
     xQueueReceive(queue, &val, portMAX_DELAY); //Wait the maximum time possible to get data from queue
   }
-
 }
 
 //Function to update the LCD (a dedicated thread will be created for this)
@@ -115,6 +90,51 @@ void lcdUpdateTask(void *pvParameters) {
       uint8_t displayed = 10 * numProducers + numConsumers;
       lcd_display_time(pendingData, displayed);
       vTaskDelay(pdMS_TO_TICKS(250)); //Update 4 times per second
+  }
+}
+
+/*#################################
+#######  Switch interrupt   #######
+#################################*/
+
+
+//Port C and D interrupt handler:
+void PORTDIntHandler(void) {
+  
+  if (PORTC->ISFR & (1 << 3)) { //Right switch pressed -> Increase consumers
+      PORTC->ISFR |= (1 << 3);  // Clear interrupt flag
+      if(numConsumers < 5){
+        xTaskCreate(removeDataTask, "Consumer", configMINIMAL_STACK_SIZE, NULL, 1, consumers[numConsumers]);
+        numConsumers ++;
+      }
+      else{
+        //Remove all the consumer tasks and reset to 0
+        for(int i = 0; i < numConsumers; i++){
+          if(consumers[i] != NULL){
+            vTaskDelete(consumers[i]);
+          }
+        }
+        numConsumers = 0;
+      }
+
+  }
+
+  if (PORTC->ISFR & (1 << 12)) { //Left switch presssed -> Increase producers
+      PORTC->ISFR |= (1 << 12);  // Clear interrupt flag
+    
+      if(numProducers < 5){
+        xTaskCreate(addDataTask, "Producer", configMINIMAL_STACK_SIZE, NULL, 1, producers[numProducers]);
+        numProducers ++;
+      }
+      else{
+        //Delete all the producer tasks and reset to 0
+        for(int i = 0; i < numProducers; i ++){
+          if(producers[i]!= NULL){
+            vTaskDelete(producers[i]);
+          }
+        }
+        numProducers = 0;
+      }
   }
 }
 
@@ -143,7 +163,7 @@ int main(void)
   vTaskStartScheduler(); //Start task scheduler
 
   //Should never reach here
-  while(1);
+  for(;;);
 
   return 0;
 }
