@@ -6,12 +6,14 @@
 
 #define MAX_PRODUCERS 5
 #define MAX_CONSUMERS 5
+#define QUEUE_SIZE 99
+#define ITEM_SIZE 1 //Size (in bytes) of an item
 
 
-uint8_t numData = 0; //Amount of data left in the queue
 uint8_t numProducers = 0; //Number of producers
 uint8_t numConsumers = 0; //Number of consumers
 
+QueueHandle_t queue;
 
 //Initialize irlclk for the lcd
 void irclk_ini()
@@ -79,17 +81,25 @@ void PORTDIntHandler(void) {
       }
   }
   uint8_t displayed = 10 * numProducers + numConsumers;
-  lcd_display_time(numData, displayed);
 }
 
 //Function that the producers will execute
-void addData(){
+void addDataTask(void *pvParameters){
 
 }
 
 //Function that the consumers will execute
-void removeData(){
+void removeDataTask(void *pvParameters){
 
+}
+
+void lcdUpdateTask(void *pvParameters) {
+  while (1) {
+      uint8_t pendingData = uxQueueMessagesWaiting(queue);
+      uint8_t displayed = 10 * numProducers + numConsumers;
+      lcd_display_time(pendingData, displayed);
+      vTaskDelay(pdMS_TO_TICKS(500));
+  }
 }
 
 
@@ -103,22 +113,20 @@ void delay(void)
 
 int main(void)
 {
-  irclk_ini(); // Enable internal ref clk to use by LCD
-
-  lcd_ini();
-  lcd_display_time(0, 0); //Display alarm and count as a time (alarm:count)
-
   SIM->COPC = 0; //Disable Watchdog
+  irclk_ini(); // Enable internal ref clk to use by LCD
+  lcd_ini();
+
+  queue = xQueueCreate(QUEUE_SIZE, ITEM_SIZE); //Initialize shared queue
 
   //Enable switches
   right_switch_init();
   left_switch_init();
-
   NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Enable button interruptions
 
   //Main loop of the program
   while(1){
-    __WFI;
+    __WFI();
   }
 
 
