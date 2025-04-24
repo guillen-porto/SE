@@ -9,11 +9,14 @@
 #define QUEUE_SIZE 99
 #define ITEM_SIZE 1 //Size (in bytes) of an item
 
-
 uint8_t numProducers = 0; //Number of producers
 uint8_t numConsumers = 0; //Number of consumers
 
-QueueHandle_t queue;
+//Handlers to be able to delete the producers and consumers
+TaskHandle_t producers[MAX_PRODUCERS];
+TaskHandle_t consumers[MAX_CONSUMERS];
+
+QueueHandle_t queue; //Handler for the queue
 
 //Initialize irlclk for the lcd
 void irclk_ini()
@@ -70,7 +73,7 @@ void PORTDIntHandler(void) {
 
   }
 
-  if (PORTC->ISFR & (1 << 12)) { //Left switch presssed -> Increase starting time/alarm time
+  if (PORTC->ISFR & (1 << 12)) { //Left switch presssed -> Increase producers
       PORTC->ISFR |= (1 << 12);  // Clear interrupt flag
     
       if(numProducers < 5){
@@ -85,29 +88,34 @@ void PORTDIntHandler(void) {
 
 //Function that the producers will execute
 void addDataTask(void *pvParameters){
+  int val;
+
+  while(1){
+    val = rand() % 100; //This will always be smaller than 128
+    xQueueSend(queue, &val, portMAX_DELAY); //The task will try to wait for the maximum time possible
+    vTaskDelay(pdMS_TO_TICKS(1000)); //1 second delay between 2 tasks
+  }
 
 }
 
 //Function that the consumers will execute
 void removeDataTask(void *pvParameters){
+  int val;
+
+  while(1){
+    xQueueReceive(queue, &val, portMAX_DELAY); //Wait the maximum time possible to get data from queue
+  }
 
 }
 
+//Function to update the LCD (a dedicated thread will be created for this)
 void lcdUpdateTask(void *pvParameters) {
   while (1) {
       uint8_t pendingData = uxQueueMessagesWaiting(queue);
       uint8_t displayed = 10 * numProducers + numConsumers;
       lcd_display_time(pendingData, displayed);
-      vTaskDelay(pdMS_TO_TICKS(500));
+      vTaskDelay(pdMS_TO_TICKS(250)); //Update 4 times per second
   }
-}
-
-
-void delay(void)
-{
-  volatile int i;
-
-  for (i = 0; i < 1000000; i++);
 }
 
 
@@ -115,20 +123,27 @@ int main(void)
 {
   SIM->COPC = 0; //Disable Watchdog
   irclk_ini(); // Enable internal ref clk to use by LCD
-  lcd_ini();
+  lcd_ini();   //Initialize LCD
+
 
   queue = xQueueCreate(QUEUE_SIZE, ITEM_SIZE); //Initialize shared queue
+
+  if(queue == NULL){
+    //Queue was not created, display error
+    lcd_display_error(1);
+  }
 
   //Enable switches
   right_switch_init();
   left_switch_init();
-  NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Enable button interruptions
+  NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Enable switch interruptions
 
-  //Main loop of the program
-  while(1){
-    __WFI();
-  }
+  xTaskCreate(lcdUpdateTask, "LCD", configMINIMAL_STACK_SIZE, NULL, 1, NULL); //Creates the task that will update the LCD
 
+  vTaskStartScheduler(); //Start task scheduler
+
+  //Should never reach here
+  while(1);
 
   return 0;
 }
