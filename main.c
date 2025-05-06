@@ -99,9 +99,9 @@ void lcdUpdateTask(void *pvParameters) {
       uint8_t pendingData = uxQueueMessagesWaiting(queue);
       uint8_t displayed = 10 * numProducers + numConsumers;
       lcd_display_time(pendingData, displayed);
-      vTaskDelay(pdMS_TO_TICKS(250)); //Update 4 times per second
+      vTaskDelay(pdMS_TO_TICKS(150)); //Update 4 times per second
   }
-}
+} 
 
 /*#################################
 #######  Switch interrupt   #######
@@ -114,7 +114,7 @@ void PORTDIntHandler(void) {
   if (PORTC->ISFR & (1 << 3)) { //Right switch pressed -> Increase consumers
       PORTC->ISFR |= (1 << 3);  // Clear interrupt flag
       if(numConsumers < 5){
-        numConsumers ++;
+        numConsumers ++; //Modifying this number automatically makes the corresponding consumer know it's not active anymore
       }
       else{
         //Reset consumers to 0
@@ -127,7 +127,7 @@ void PORTDIntHandler(void) {
       PORTC->ISFR |= (1 << 12);  // Clear interrupt flag
     
       if(numProducers < 5){
-        numProducers ++;
+        numProducers ++; //Modifying this number automatically makes the corresponding  producer know it's not active anymore
       }
       else{
         //Reset pproducers to 0
@@ -163,7 +163,7 @@ int main(void)
 
   //Create producers and consumers
 
-  static int producers[MAX_PRODUCERS]; //Each number will be passed to its corresponding producer as an argument
+  int producers[MAX_PRODUCERS]; //Each number will be passed to its corresponding producer as an argument
   for(int i = 0; i < MAX_PRODUCERS; i++){
 
     producers[i] = i;
@@ -171,7 +171,7 @@ int main(void)
   }
 
 
-  static int consumers[MAX_CONSUMERS]; //Each number will be passed to its corresponding consumer as an argument
+  int consumers[MAX_CONSUMERS]; //Each number will be passed to its corresponding consumer as an argument
   for(int i = 0; i < MAX_CONSUMERS; i++){
 
     consumers[i] = i;
