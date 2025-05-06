@@ -80,6 +80,7 @@ void removeDataTask(void *pvParameters){
 
   while(1){
     xQueueReceive(queue, &val, portMAX_DELAY); //Wait the maximum time possible to get data from queue
+    vTaskDelay(pdMS_TO_TICKS(1000)); //1 second delay between 2 tasks
   }
 }
 
@@ -104,7 +105,7 @@ void PORTDIntHandler(void) {
   if (PORTC->ISFR & (1 << 3)) { //Right switch pressed -> Increase consumers
       PORTC->ISFR |= (1 << 3);  // Clear interrupt flag
       if(numConsumers < 5){
-        xTaskCreate(removeDataTask, "Consumer", configMINIMAL_STACK_SIZE, NULL, 1, consumers[numConsumers]);
+        xTaskCreate(removeDataTask, "ConsumerTask", configMINIMAL_STACK_SIZE, NULL, 1, consumers[numConsumers]);
         numConsumers ++;
       }
       else{
@@ -123,7 +124,7 @@ void PORTDIntHandler(void) {
       PORTC->ISFR |= (1 << 12);  // Clear interrupt flag
     
       if(numProducers < 5){
-        xTaskCreate(addDataTask, "Producer", configMINIMAL_STACK_SIZE, NULL, 1, producers[numProducers]);
+        xTaskCreate(addDataTask, "ProducerTask", configMINIMAL_STACK_SIZE, NULL, 1, producers[numProducers]);
         numProducers ++;
       }
       else{
@@ -158,7 +159,7 @@ int main(void)
   left_switch_init();
   NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Enable switch interruptions
 
-  xTaskCreate(lcdUpdateTask, "LCD", configMINIMAL_STACK_SIZE, NULL, 1, NULL); //Creates the task that will update the LCD
+  xTaskCreate(lcdUpdateTask, "LCDTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL); //Creates the task that will update the LCD
 
   vTaskStartScheduler(); //Start task scheduler
 
