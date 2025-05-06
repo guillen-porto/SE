@@ -4,18 +4,21 @@
 #include "task.h"
 #include "queue.h"
 #include <stdlib.h>
+#include <string.h>
 
+//Max number of producers and consumers, one variable would be enough, as they are the same, but this way it can be more easily changed
 #define MAX_PRODUCERS 5
 #define MAX_CONSUMERS 5
+
 #define QUEUE_SIZE 99
 #define ITEM_SIZE 1 //Size (in bytes) of an item
 
 uint8_t numProducers = 0; //Number of producers
 uint8_t numConsumers = 0; //Number of consumers
 
-//Handlers to be able to delete the producers and consumers
-TaskHandle_t producers[MAX_PRODUCERS];
-TaskHandle_t consumers[MAX_CONSUMERS];
+//Handlers to be able to delete the producers and consumers (NOT NECESSARY RIGHT NOW)
+/*TaskHandle_t producers[MAX_PRODUCERS];
+TaskHandle_t consumers[MAX_CONSUMERS];*/
 
 QueueHandle_t queue; //Handler for the queue
 
@@ -63,23 +66,29 @@ void left_switch_init(void){
 #################################*/
 
 //Function that the producers will execute
-void addDataTask(void *pvParameters){
+void producerTask(void *pvParameters){
+  int* id = (int*)pvParameters;
   int val;
 
   while(1){
-    val = rand() % 100; //This will always be smaller than 128
-    xQueueSend(queue, &val, portMAX_DELAY); //The task will try to wait for the maximum time possible
+    if(*id < numProducers){ //Check if this producer is active
+      val = rand() % 100; //This will always be smaller than 128
+      xQueueSend(queue, &val, portMAX_DELAY); //The task will try to wait for the maximum time possible
+    }
     vTaskDelay(pdMS_TO_TICKS(1000)); //1 second delay between 2 tasks
   }
 
 }
 
 //Function that the consumers will execute
-void removeDataTask(void *pvParameters){
+void consumerTask(void *pvParameters){
+  int* id = (int*)pvParameters;
   int val;
 
   while(1){
-    xQueueReceive(queue, &val, portMAX_DELAY); //Wait the maximum time possible to get data from queue
+    if(*id < numConsumers){ //Check if this consumer is active
+      xQueueReceive(queue, &val, portMAX_DELAY); //Wait the maximum time possible to get data from queue
+    }
     vTaskDelay(pdMS_TO_TICKS(1000)); //1 second delay between 2 tasks
   }
 }
@@ -105,16 +114,10 @@ void PORTDIntHandler(void) {
   if (PORTC->ISFR & (1 << 3)) { //Right switch pressed -> Increase consumers
       PORTC->ISFR |= (1 << 3);  // Clear interrupt flag
       if(numConsumers < 5){
-        xTaskCreate(removeDataTask, "ConsumerTask", configMINIMAL_STACK_SIZE, NULL, 1, consumers[numConsumers]);
         numConsumers ++;
       }
       else{
-        //Remove all the consumer tasks and reset to 0
-        for(int i = 0; i < numConsumers; i++){
-          if(consumers[i] != NULL){
-            vTaskDelete(consumers[i]);
-          }
-        }
+        //Reset consumers to 0
         numConsumers = 0;
       }
 
@@ -124,16 +127,10 @@ void PORTDIntHandler(void) {
       PORTC->ISFR |= (1 << 12);  // Clear interrupt flag
     
       if(numProducers < 5){
-        xTaskCreate(addDataTask, "ProducerTask", configMINIMAL_STACK_SIZE, NULL, 1, producers[numProducers]);
         numProducers ++;
       }
       else{
-        //Delete all the producer tasks and reset to 0
-        for(int i = 0; i < numProducers; i ++){
-          if(producers[i]!= NULL){
-            vTaskDelete(producers[i]);
-          }
-        }
+        //Reset pproducers to 0
         numProducers = 0;
       }
   }
@@ -159,7 +156,27 @@ int main(void)
   left_switch_init();
   NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Enable switch interruptions
 
+
+  //Create LCD updating task
   xTaskCreate(lcdUpdateTask, "LCDTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL); //Creates the task that will update the LCD
+
+
+  //Create producers and consumers
+
+  static int producers[MAX_PRODUCERS]; //Each number will be passed to its corresponding producer as an argument
+  for(int i = 0; i < MAX_PRODUCERS; i++){
+
+    producers[i] = i;
+    xTaskCreate(producerTask, "Producer", configMINIMAL_STACK_SIZE, &producers[i], 1, NULL); 
+  }
+
+
+  static int consumers[MAX_CONSUMERS]; //Each number will be passed to its corresponding consumer as an argument
+  for(int i = 0; i < MAX_CONSUMERS; i++){
+
+    consumers[i] = i;
+    xTaskCreate(consumerTask, "Consumer", configMINIMAL_STACK_SIZE, &consumers[i], 1, NULL); 
+  }
 
   vTaskStartScheduler(); //Start task scheduler
 
