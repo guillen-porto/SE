@@ -1,43 +1,23 @@
-# Trabajo Tutelado 1 - SE 24/25
+# Práctica 5 - SE 24/25
 
-Este proyecto consiste en implementar un temporizador programable en la placa FRDM-KL46Z mediante uno de sus temporizadores internos: el TPM (Timer/PWM Module).
+Esta práctica consiste en implementar un sistema de productores consumidores que acceden  una cola compartida utiilzando el sistema operativo **FreeRTOS** (obtenido de la la sdk de la **FRDM-KL46Z**)
 
 ## Funcionamiento del programa
 
-El programa inicia mostrándole al usuario los valores de cuenta y alarma en el LCD, en formato `ALARMA:CUENTA`.
+El programa tiene las siguientes características:
 
-### 1 - Configuración del valor del temporizador
+- Las 2 primeras cifras del LCD corresponden al número de tareas reastantes en la cola, y las dos siguientes al número de productores y consumidores, respectivamente
+- Con el botón izquierdo de la placa se pueden aumentar el número de productores, y con el derecho, el de consumidores.
+- El límite de productores y de consumidores es 5. Si se intenta aumentar en este punto, volverá a 0.
 
-En este primer estado, el valor de **CUENTA** comienza a parpadear para mostrarle al usuario que es el valor que está siendo modificado. El usuario puede **aumentar** este valor  pulsando el **botón izquierdo** de la placa o **pasar al siguiente estado** pulsando el **botón derecho**.
-Si el valor de cuenta llega a 99 (valor máximo), aumentarlo volverá a dejarlo en 0.
-
-### 2 - Configuración del valor de alarma
-
-Este estado es similar al anterior, pero ahora parpadea el valor de **ALARMA**. El usuario puede **aumentarlo** con el botón izquierdo o **pasar al siguiente estado** con el botón derecho.
-Si el valor de alarma llega a 99 (valor máximo), aumentarlo volverá a dejarlo en 0.
-En caso de que el usuario introduzca un valor de alarma mayor que el de cuenta, al intentar pasar a la siguiente fase se mostrará un error en el LCD.
-
-### 3 - Modo de cuenta atrás
-
-En este modo se realiza la cuenta atrás, reduciendo el valor de la cuenta en 1 cada segundo. Una vez el valor de cuenta sea menor o igual que el de alarma, los LEDs de la placa empezarán a parpadear periódicamente (cambiando su estado una vez por segundo).
-
-El usuario puede **pausar o reanudar** la cuenta en cualquier momento pulsando el botón izquierdo.
-
-### 4 - Finalización del programa
-
-Al pasar a este estado, sucede lo siguiente:
-
-- Se deshabilitan las interrupciones, por lo que el usuario no puede interactuar con el sistema como en los anteriores pasos
-- Se apagan los LEDs en caso de que hubieran quedado encendidos al finalizar la fase anterior.
-- En el LCD de la placa, el valor de la cuenta pasará a parpadear periódicamente.
 
 ## Detalles de implementación
 
 A continuación se detallarán algunos detalles de interés sobre la implementación del programa:
 
-### Elección de reloj
+### Actualización del LCD
 
-Para su funcionamiento, el TPM utiliza uno de los relojes de la placa, lo cual se debe decidir mediante el valor del registro `SIM_SOPT_TPMSRC`. Yo decidí utilizar el **IRCLK (Internal Reference Clock)**, ya que era el que tenía una frecuencia más baja (permitiendo crear un temporizador de 1Hz de frecuencia fácilmente) y porque este reloj ya debía ser activado para utilizar el LCD, por lo cual el reutilizarlo evita el activar más relojes innecesariamente.
+Para actualizar el LCD, se creó una tarea independiente que lo actualiza de manera periódica. Esto se hizo para que la frecuencia de actualización no dependiese del número de productores/consumidores.
 
 ### Obtención de una frecuencia de 1 Hz
 
