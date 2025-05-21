@@ -1,37 +1,3 @@
-/*
- * The Clear BSD License
- * Copyright (c) 2015, Freescale Semiconductor, Inc.
- * Copyright 2016-2017 NXP
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted (subject to the limitations in the disclaimer below) provided
- *  that the following conditions are met:
- *
- * o Redistributions of source code must retain the above copyright notice, this list
- *   of conditions and the following disclaimer.
- *
- * o Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * o Neither the name of the copyright holder nor the names of its
- *   contributors may be used to endorse or promote products derived from this
- *   software without specific prior written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE.
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 #include "fsl_debug_console.h"
 #include "board.h"
 #include "fsl_tpm.h"
@@ -44,8 +10,8 @@
  ******************************************************************************/
 /* The Flextimer instance/channel used for board */
 #define BOARD_TPM_BASEADDR TPM0
-#define BOARD_FIRST_TPM_CHANNEL 2U
-#define BOARD_SECOND_TPM_CHANNEL 5U
+#define LED_GREEN_CHANNEL 2U
+#define LED_RED_CHANNEL 5U
 
 /* Get source clock for TPM driver */
 #define TPM_SOURCE_CLOCK CLOCK_GetFreq(kCLOCK_PllFllSelClk)
@@ -63,11 +29,39 @@ volatile uint8_t updatedDutycycle = 10U;
 /*******************************************************************************
  * Code
  ******************************************************************************/
-/*!
- * @brief Main function
- */
-int main(void)
+
+
+// TSI initialization function
+void TSI_Init(void)
 {
+    // Enable clock for TSI PortB 16 and 17
+    SIM->SCGC5 |= SIM_SCGC5_TSI_MASK;
+     
+     
+    TSI0->GENCS = TSI_GENCS_OUTRGF_MASK |  // Out of range flag, set to 1 to clear
+                                //TSI_GENCS_ESOR_MASK |  // This is disabled to give an interrupt when out of range.  Enable to give an interrupt when end of scan
+                                TSI_GENCS_MODE(0u) |  // Set at 0 for capacitive sensing.  Other settings are 4 and 8 for threshold detection, and 12 for noise detection
+                                TSI_GENCS_REFCHRG(0u) | // 0-7 for Reference charge
+                                TSI_GENCS_DVOLT(0u) | // 0-3 sets the Voltage range
+                                TSI_GENCS_EXTCHRG(0u) | //0-7 for External charge
+                                TSI_GENCS_PS(0u) | // 0-7 for electrode prescaler
+                                TSI_GENCS_NSCN(31u) | // 0-31 + 1 for number of scans per electrode
+                                TSI_GENCS_TSIEN_MASK | // TSI enable bit
+                                //TSI_GENCS_TSIIEN_MASK | //TSI interrupt is disables
+                                TSI_GENCS_STPE_MASK | // Enables TSI in low power mode
+                                //TSI_GENCS_STM_MASK | // 0 for software trigger, 1 for hardware trigger
+                                //TSI_GENCS_SCNIP_MASK | // scan in progress flag
+                                TSI_GENCS_EOSF_MASK ; // End of scan flag, set to 1 to clear
+                                //TSI_GENCS_CURSW_MASK; // Do not swap current sources
+     
+    // The TSI threshold isn't used is in this application
+//    TSI0->TSHD =     TSI_TSHD_THRESH(0x0000) |
+//                                TSI_TSHD_THRESL(0x0000);
+                                 
+}
+
+//PWM initialization function
+void PWM_Init(void){
     tpm_config_t tpmInfo;
     tpm_chnl_pwm_signal_param_t tpmParam[2];
 
@@ -76,20 +70,38 @@ int main(void)
     #endif    
     
     /* Configure tpm params with frequency 24kHZ */
-    tpmParam[0].chnlNumber = (tpm_chnl_t)BOARD_FIRST_TPM_CHANNEL;
+    tpmParam[0].chnlNumber = (tpm_chnl_t)LED_GREEN_CHANNEL;
     tpmParam[0].level = TPM_LED_ON_LEVEL;
     tpmParam[0].dutyCyclePercent = updatedDutycycle;
 
-    tpmParam[1].chnlNumber = (tpm_chnl_t)BOARD_SECOND_TPM_CHANNEL;
+    tpmParam[1].chnlNumber = (tpm_chnl_t)LED_RED_CHANNEL;
     tpmParam[1].level = TPM_LED_ON_LEVEL;
     tpmParam[1].dutyCyclePercent = updatedDutycycle;
+
+    CLOCK_SetTpmClock(1U);
+
+    TPM_GetDefaultConfig(&tpmInfo);
+    /* Initialize TPM module */
+    TPM_Init(BOARD_TPM_BASEADDR, &tpmInfo);
+
+    TPM_SetupPwm(BOARD_TPM_BASEADDR, tpmParam, 2U, kTPM_EdgeAlignedPwm, 24000U, TPM_SOURCE_CLOCK);
+    TPM_StartTimer(BOARD_TPM_BASEADDR, kTPM_SystemClock);
+}
+
+
+
+
+
+int main(void)
+{
+    PWM_Init();
+    TSI_Init();
 
     /* Board pin, clock, debug console init */
     BOARD_InitPins();
     BOARD_BootClockRUN();
     BOARD_InitDebugConsole();
     /* Select the clock source for the TPM counter as kCLOCK_PllFllSelClk */
-    CLOCK_SetTpmClock(1U);
 
     /* Print a note to terminal */
     PRINTF("\r\nTPM example to output PWM on 2 channels\r\n");
@@ -108,12 +120,6 @@ int main(void)
      * tpmInfo.triggerSelect = kTPM_Trigger_Select_0;
      * tpmInfo.triggerSource = kTPM_TriggerSource_External;
      */
-    TPM_GetDefaultConfig(&tpmInfo);
-    /* Initialize TPM module */
-    TPM_Init(BOARD_TPM_BASEADDR, &tpmInfo);
-
-    TPM_SetupPwm(BOARD_TPM_BASEADDR, tpmParam, 2U, kTPM_EdgeAlignedPwm, 24000U, TPM_SOURCE_CLOCK);
-    TPM_StartTimer(BOARD_TPM_BASEADDR, kTPM_SystemClock);
     while (1)
     {
         do
@@ -130,9 +136,9 @@ int main(void)
         updatedDutycycle = getCharValue * 10U;
 
         /* Start PWM mode with updated duty cycle */
-        TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)BOARD_FIRST_TPM_CHANNEL, kTPM_EdgeAlignedPwm,
+        TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)LED_GREEN_CHANNEL, kTPM_EdgeAlignedPwm,
                                updatedDutycycle);
-        TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)BOARD_SECOND_TPM_CHANNEL, kTPM_EdgeAlignedPwm,
+        TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)LED_RED_CHANNEL, kTPM_EdgeAlignedPwm,
                                updatedDutycycle);
 
         PRINTF("The duty cycle was successfully updated!\r\n");
