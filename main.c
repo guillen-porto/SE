@@ -1,187 +1,140 @@
-#include "MKL46Z4.h"
-#include "lcd.h"
-#include "FreeRTOS.h"
-#include "task.h"
-#include "queue.h"
-#include <stdlib.h>
-#include <string.h>
+/*
+ * The Clear BSD License
+ * Copyright (c) 2015, Freescale Semiconductor, Inc.
+ * Copyright 2016-2017 NXP
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted (subject to the limitations in the disclaimer below) provided
+ *  that the following conditions are met:
+ *
+ * o Redistributions of source code must retain the above copyright notice, this list
+ *   of conditions and the following disclaimer.
+ *
+ * o Redistributions in binary form must reproduce the above copyright notice, this
+ *   list of conditions and the following disclaimer in the documentation and/or
+ *   other materials provided with the distribution.
+ *
+ * o Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from this
+ *   software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS LICENSE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
-//Max number of producers and consumers, one variable would be enough, as they are the same, but this way it can be more easily changed
-#define MAX_PRODUCERS 5
-#define MAX_CONSUMERS 5
+#include "fsl_debug_console.h"
+#include "board.h"
+#include "fsl_tpm.h"
 
-#define QUEUE_SIZE 99
-#define ITEM_SIZE 1 //Size (in bytes) of an item
+#include "fsl_common.h"
+#include "pin_mux.h"
+#include "clock_config.h"
+/*******************************************************************************
+ * Definitions
+ ******************************************************************************/
+/* The Flextimer instance/channel used for board */
+#define BOARD_TPM_BASEADDR TPM0
+#define BOARD_FIRST_TPM_CHANNEL 2U
+#define BOARD_SECOND_TPM_CHANNEL 5U
 
-uint8_t numProducers = 0; //Number of producers
-uint8_t numConsumers = 0; //Number of consumers
+/* Get source clock for TPM driver */
+#define TPM_SOURCE_CLOCK CLOCK_GetFreq(kCLOCK_PllFllSelClk)
 
-//Handlers to be able to delete the producers and consumers (NOT NECESSARY RIGHT NOW)
-/*TaskHandle_t producers[MAX_PRODUCERS];
-TaskHandle_t consumers[MAX_CONSUMERS];*/
+/*******************************************************************************
+ * Prototypes
+ ******************************************************************************/
 
-QueueHandle_t queue; //Handler for the queue
+/*******************************************************************************
+ * Variables
+ ******************************************************************************/
+volatile uint8_t getCharValue = 0U;
+volatile uint8_t updatedDutycycle = 10U;
 
-//Initialize irlclk for the lcd
-void irclk_ini()
-{
-  MCG->C1 = MCG_C1_IRCLKEN(1) | MCG_C1_IREFSTEN(1);
-  MCG->C2 = MCG_C2_IRCS(0); //0 32KHZ internal reference clock; 1= 4MHz irc
-}
-
-
-//Right switch
-void right_switch_init(void){
-  SIM->SCGC5 |= SIM_SCGC5_PORTC(1); //Enable port C4
-
-  PORTC->PCR[3] |= PORT_PCR_MUX(1); //Set as GPIO
-
-  PORTC->PCR[3] |= PORT_PCR_PE(1); //Pull enable
-
-  PORTC->PCR[3] |= PORT_PCR_PS(1); //Pull up
-
-  GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 3)); //Sets pin 3 of port c as input(0)
-
-  PORTC->PCR[3] |= PORT_PCR_IRQC(10); //10 (1010): Interrupt on falling edge (when button is pressed) 
-}
-
-//Left switch
-void left_switch_init(void){
-
-  SIM->SCGC5 |= SIM_SCGC5_PORTC(1); //Enable port C4 (probably not needed as it's done on the other function)
-
-  PORTC->PCR[12] |= PORT_PCR_MUX(1); //Set as GPIO
-
-  PORTC->PCR[12] |= PORT_PCR_PE(1); //Pull enable
-
-  PORTC->PCR[12] |= PORT_PCR_PS(1); //Pull up
-
-  GPIOC->PDDR &= GPIO_PDDR_PDD(~(1 << 12)); //Sets pin 12 of port c as input(0)
-
-  PORTC->PCR[12] |= PORT_PCR_IRQC(10); //10 (1010): Interrupt on falling edge (when buttoon is pressed) 
-}
-
-/*#################################
-########  TASK FUNCTIONS   ########
-#################################*/
-
-//Function that the producers will execute
-void producerTask(void *pvParameters){
-  int* id = (int*)pvParameters;
-  int val;
-
-  while(1){
-    if(*id < numProducers){ //Check if this producer is active
-      val = rand() % 100; //This will always be smaller than 128
-      xQueueSend(queue, &val, portMAX_DELAY); //The task will try to wait for the maximum time possible
-    }
-    vTaskDelay(pdMS_TO_TICKS(1000)); //1 second delay between 2 tasks
-  }
-
-}
-
-//Function that the consumers will execute
-void consumerTask(void *pvParameters){
-  int* id = (int*)pvParameters;
-  int val;
-
-  while(1){
-    if(*id < numConsumers){ //Check if this consumer is active
-      xQueueReceive(queue, &val, portMAX_DELAY); //Wait the maximum time possible to get data from queue
-    }
-    vTaskDelay(pdMS_TO_TICKS(1000)); //1 second delay between 2 tasks
-  }
-}
-
-//Function to update the LCD (a dedicated thread will be created for this)
-void lcdUpdateTask(void *pvParameters) {
-  while (1) {
-      uint8_t pendingData = uxQueueMessagesWaiting(queue);
-      uint8_t displayed = 10 * numProducers + numConsumers;
-      lcd_display_time(pendingData, displayed);
-      vTaskDelay(pdMS_TO_TICKS(150)); //Update 4 times per second
-  }
-} 
-
-/*#################################
-#######  Switch interrupt   #######
-#################################*/
-
-
-//Port C and D interrupt handler:
-void PORTDIntHandler(void) {
-  
-  if (PORTC->ISFR & (1 << 3)) { //Right switch pressed -> Increase consumers
-      PORTC->ISFR |= (1 << 3);  // Clear interrupt flag
-      if(numConsumers < 5){
-        numConsumers ++; //Modifying this number automatically makes the corresponding consumer know it's not active anymore
-      }
-      else{
-        //Reset consumers to 0
-        numConsumers = 0;
-      }
-
-  }
-
-  if (PORTC->ISFR & (1 << 12)) { //Left switch presssed -> Increase producers
-      PORTC->ISFR |= (1 << 12);  // Clear interrupt flag
-    
-      if(numProducers < 5){
-        numProducers ++; //Modifying this number automatically makes the corresponding  producer know it's not active anymore
-      }
-      else{
-        //Reset pproducers to 0
-        numProducers = 0;
-      }
-  }
-}
-
-
+/*******************************************************************************
+ * Code
+ ******************************************************************************/
+/*!
+ * @brief Main function
+ */
 int main(void)
 {
-  SIM->COPC = 0; //Disable Watchdog
-  irclk_ini(); // Enable internal ref clk to use by LCD
-  lcd_ini();   //Initialize LCD
+    tpm_config_t tpmInfo;
+    tpm_chnl_pwm_signal_param_t tpmParam[2];
 
+    #ifndef TPM_LED_ON_LEVEL  
+      #define TPM_LED_ON_LEVEL kTPM_LowTrue
+    #endif    
+    
+    /* Configure tpm params with frequency 24kHZ */
+    tpmParam[0].chnlNumber = (tpm_chnl_t)BOARD_FIRST_TPM_CHANNEL;
+    tpmParam[0].level = TPM_LED_ON_LEVEL;
+    tpmParam[0].dutyCyclePercent = updatedDutycycle;
 
-  queue = xQueueCreate(QUEUE_SIZE, ITEM_SIZE); //Initialize shared queue
+    tpmParam[1].chnlNumber = (tpm_chnl_t)BOARD_SECOND_TPM_CHANNEL;
+    tpmParam[1].level = TPM_LED_ON_LEVEL;
+    tpmParam[1].dutyCyclePercent = updatedDutycycle;
 
-  if(queue == NULL){
-    //Queue was not created, display error
-    lcd_display_error(1);
-  }
+    /* Board pin, clock, debug console init */
+    BOARD_InitPins();
+    BOARD_BootClockRUN();
+    BOARD_InitDebugConsole();
+    /* Select the clock source for the TPM counter as kCLOCK_PllFllSelClk */
+    CLOCK_SetTpmClock(1U);
 
-  //Enable switches
-  right_switch_init();
-  left_switch_init();
-  NVIC_EnableIRQ(PORTC_PORTD_IRQn); //Enable switch interruptions
+    /* Print a note to terminal */
+    PRINTF("\r\nTPM example to output PWM on 2 channels\r\n");
+    PRINTF("\r\nIf an LED is connected to the TPM pin, you will see a change in LED brightness if you enter different values");
+    PRINTF("\r\nIf no LED is connected to the TPM pin, then probe the signal using an oscilloscope");
 
+    /*
+     * tpmInfo.prescale = kTPM_Prescale_Divide_1;
+     * tpmInfo.useGlobalTimeBase = false;
+     * tpmInfo.enableDoze = false;
+     * tpmInfo.enableDebugMode = false;
+     * tpmInfo.enableReloadOnTrigger = false;
+     * tpmInfo.enableStopOnOverflow = false;
+     * tpmInfo.enableStartOnTrigger = false;
+     * tpmInfo.enablePauseOnTrigger = false;
+     * tpmInfo.triggerSelect = kTPM_Trigger_Select_0;
+     * tpmInfo.triggerSource = kTPM_TriggerSource_External;
+     */
+    TPM_GetDefaultConfig(&tpmInfo);
+    /* Initialize TPM module */
+    TPM_Init(BOARD_TPM_BASEADDR, &tpmInfo);
 
-  //Create LCD updating task
-  xTaskCreate(lcdUpdateTask, "LCDTask", configMINIMAL_STACK_SIZE, NULL, 1, NULL); //Creates the task that will update the LCD
+    TPM_SetupPwm(BOARD_TPM_BASEADDR, tpmParam, 2U, kTPM_EdgeAlignedPwm, 24000U, TPM_SOURCE_CLOCK);
+    TPM_StartTimer(BOARD_TPM_BASEADDR, kTPM_SystemClock);
+    while (1)
+    {
+        do
+        {
+            PRINTF("\r\nPlease enter a value to update the Duty cycle:\r\n");
+            PRINTF("Note: The range of value is 0 to 9.\r\n");
+            PRINTF("For example: If enter '5', the duty cycle will be set to 50 percent.\r\n");
+            PRINTF("Value:");
+            getCharValue = GETCHAR() - 0x30U;
+            PRINTF("%d", getCharValue);
+            PRINTF("\r\n");
+        } while (getCharValue > 9U);
 
+        updatedDutycycle = getCharValue * 10U;
 
-  //Create producers and consumers
+        /* Start PWM mode with updated duty cycle */
+        TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)BOARD_FIRST_TPM_CHANNEL, kTPM_EdgeAlignedPwm,
+                               updatedDutycycle);
+        TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)BOARD_SECOND_TPM_CHANNEL, kTPM_EdgeAlignedPwm,
+                               updatedDutycycle);
 
-  int producers[MAX_PRODUCERS]; //Each number will be passed to its corresponding producer as an argument
-  for(int i = 0; i < MAX_PRODUCERS; i++){
-
-    producers[i] = i;
-    xTaskCreate(producerTask, "Producer", configMINIMAL_STACK_SIZE, &producers[i], 1, NULL); 
-  }
-
-
-  int consumers[MAX_CONSUMERS]; //Each number will be passed to its corresponding consumer as an argument
-  for(int i = 0; i < MAX_CONSUMERS; i++){
-
-    consumers[i] = i;
-    xTaskCreate(consumerTask, "Consumer", configMINIMAL_STACK_SIZE, &consumers[i], 1, NULL); 
-  }
-
-  vTaskStartScheduler(); //Start task scheduler
-
-  //Should never reach here
-  for(;;);
-
-  return 0;
+        PRINTF("The duty cycle was successfully updated!\r\n");
+    }
 }

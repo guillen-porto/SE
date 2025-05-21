@@ -1,3 +1,5 @@
+#include "MKL46Z4.h"
+
 //*****************************************************************************
 // Declaration of the default fault handlers
 //*****************************************************************************
@@ -145,6 +147,7 @@ void (* const g_pfnVectors[])(void) =
 //*****************************************************************************
 void Default_ResetHandler(void)
 {
+  SIM->COPC = 0; //Deactivate watchdog
   unsigned long *pulSrc, *pulDest;
 
   /* copy the data segment initializers from flash to SRAM */
