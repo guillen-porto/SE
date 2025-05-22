@@ -16,9 +16,10 @@
 /* Get source clock for TPM driver */
 #define TPM_SOURCE_CLOCK CLOCK_GetFreq(kCLOCK_PllFllSelClk)
 
+//Offset will be substracted to the values obtained via the TSI
 #define OFFSET 1000
-#define MIN_VAL 500
-
+//If the total value obtained is less than min_val, it won't be taken into account
+#define MIN_VAL 100
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -43,7 +44,7 @@ void TSI_Init(void)
      
     TSI0->GENCS = TSI_GENCS_OUTRGF_MASK |  // Out of range flag, set to 1 to clear
                                 //TSI_GENCS_ESOR_MASK |  // This is disabled to give an interrupt when out of range.  Enable to give an interrupt when end of scan
-                                TSI_GENCS_MODE(4u) |  // Set at 0 for capacitive sensing.  Other settings are 4 and 8 for threshold detection, and 12 for noise detection
+                                TSI_GENCS_MODE(0u) |  // Set at 0 for capacitive sensing.  Other settings are 4 and 8 for threshold detection, and 12 for noise detection
                                 TSI_GENCS_REFCHRG(4u) | // 0-7 for Reference charge
                                 TSI_GENCS_DVOLT(1u) | // 0-3 sets the Voltage range
                                 TSI_GENCS_EXTCHRG(5u) | //0-7 for External charge
@@ -107,17 +108,17 @@ void PWM_Init(void){
 
 
 //Function to read a channel of the TSI ()
-uint16_t read_TSI_channel(uint8_t channel)
+uint16_t read_TSI_channel(uint8_t channel) //Channel will be either 9 or 10
 {
     int scan;
-    TSI0->DATA =     TSI_DATA_TSICH(channel); // Using channel 10 of The TSI
+    TSI0->DATA = TSI_DATA_TSICH(channel);
     TSI0->DATA |= TSI_DATA_SWTS(1); // Software trigger for scan
 
     while (!(TSI0->GENCS & TSI_GENCS_EOSF_MASK)); //Wait until scan has ended (end of scan flag set to 1)
     scan = TSI0->DATA & TSI_DATA_TSICNT_MASK; //Read the content of the counter in the TSI_DATA register
     TSI0->GENCS |= TSI_GENCS_EOSF_MASK ; // Reset end of scan flag
      
-    //PRINTF("Channel %u: scan: %u", channel, scan);
+    PRINTF("Channel %u: scan: %u", channel, scan);
 
     scan = scan - OFFSET;
     if(scan < 0) scan = 0; //Don't return negative numbers
@@ -135,18 +136,23 @@ void get_led_values(uint16_t* green_val, uint16_t* red_val){
         *green_val = (100 *chan_9) / total;
         *red_val = (100 * chan_10) / total;
     }
+    else{
+        *green_val = 0;
+        *red_val = 0;
+    }
 }
 
 
 int main(void)
 {
-    PWM_Init();
-    TSI_Init();
 
     /* Board pin, clock, debug console init */
     BOARD_InitPins();
     BOARD_BootClockRUN();
     BOARD_InitDebugConsole();
+
+    PWM_Init();
+    TSI_Init();
 
     uint16_t green_led_val = 0;
     uint16_t red_led_val = 0;
