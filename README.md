@@ -1,29 +1,29 @@
-# Práctica 5 - SE 24/25
+# Trabajo Tutelado 2 - SE 24/25
 
-Esta práctica consiste en implementar un sistema de productores consumidores que acceden  una cola compartida utilzando el sistema operativo **FreeRTOS** (obtenido de la la SDK de la **FRDM-KL46Z**)
+Este trabajo consistía en implementar un programa que, utilizando el PWM, modificase la intensidad de los LEDs de la placa dependiendo de los valores obtenidos por uno de sus sensores. En mi caso, utilicé el módulo TSI (Touch Sensing Input)
 
 ## Funcionamiento del programa
 
-El programa tiene las siguientes características:
+El programa funciona de la siguiente manera:
 
-- Las 2 primeras cifras del LCD corresponden al número de tareas restantes en la cola, y las dos siguientes al número de productores y consumidores, respectivamente
-- Con el botón izquierdo de la placa se pueden aumentar el número de productores, y con el derecho, el de consumidores.
-- El límite de productores y de consumidores es 5. Si se intenta aumentar en este punto, volverá a 0.
-
+- Si el usuario no está tocando el *slider* de la placa, ambos LEDs están apagados.
+- Cuanto más cerca de la **izquierda** del *slider* presione el usuario, más intensamente brillará el LED **rojo**.
+- Cuanto más cerca de la **derecha** del *slider* presione el usuario, más intensamente brillará el LED **verde**.
 
 ## Detalles de implementación
 
 A continuación se detallarán algunos detalles de interés sobre la implementación del programa:
 
-### Actualización del LCD
+### Función de inicialización del TSI
 
-Para actualizar el LCD, se creó una tarea independiente que lo actualiza de manera periódica. Esto se hizo para que la frecuencia de actualización no dependiese del número de productores/consumidores.
+Los valores de la función de inicialización del TSI fueron ligeramente modificados con respecto al ejemplo dado en las *slides* (<https://forum.digikey.com/t/using-the-capacitive-touch-sensor-on-the-frdm-kl46z/13246>). Esto se hizo para aumentar la precisión de medida (ya que se aumentan el número de mediciones) a costa de aumentar algo el consumo de la placa.
 
-### "Pool" de tareas
+### Detección de la posición en el slider
 
-Para implementar la activación y desactivación de los hilos, había dos opciones principales:
+Para calcular en qué zona del slider se está presionando, me ayudé de las funciones dadas en el foro antes mencionado. Creé un método propio a partir de *Touch_Scan_LH* y *Touch_Scan_HL* que me permitiese pasarle el canal por parámetro, para evitar repetición de código. Además, por seguridad, añadí la siguiente línea:
+```while (!(TSI0->GENCS & TSI_GENCS_EOSF_MASK))```
+Esta hace que la función espere hasta que el escaneo acabe antes de comprobar el valor del registro que contiene los datos obtenidos.
 
-- Creación de todos los hilos al iniciar el programa, y uso de una variable para comprobar si un hilo está activo (una especie de "pool" de hilos)
-- Creación y destrucción dinámica de los hilos que suceda en las interrupciones.
+### Función para obtener los valores del LED
 
-Debido a que el número máximo de hilos de cada tipo era conocido (y bajo), decidí que la mejor opción era la primera. Para controlar si un hilo estaba activo o no, decidí que cada uno de ellos tuviese un número del 0 al 4. Si el número del hilo es menor que el número de productores actual, este estará activo. En caso contrario, estará inactivo. Esto es algo menos flexible que, por ejemplo, asignar un booleano a cada hilo que se pueda modificar desde otras partes del programa (como desde las interrupciones), pero consideré que en este caso esta versión simple era suficiente.
+Este es un detalle menos importante, pero lo consideré de interés igualmente. Creé una función para obtener los valores del LED ya que, en caso de que se quisiese extender el proyecto para usar cualquier otro tipo de sensor, la firma de la función podría mantenerse constante.

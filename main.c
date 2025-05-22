@@ -27,7 +27,7 @@
 /*******************************************************************************
  * Variables
  ******************************************************************************/
-volatile uint8_t getCharValue = 0U;
+
 volatile uint8_t updatedDutycycle = 10U;
 
 /*******************************************************************************
@@ -117,8 +117,6 @@ uint16_t read_TSI_channel(uint8_t channel) //Channel will be either 9 or 10
     while (!(TSI0->GENCS & TSI_GENCS_EOSF_MASK)); //Wait until scan has ended (end of scan flag set to 1)
     scan = TSI0->DATA & TSI_DATA_TSICNT_MASK; //Read the content of the counter in the TSI_DATA register
     TSI0->GENCS |= TSI_GENCS_EOSF_MASK ; // Reset end of scan flag
-     
-    PRINTF("Channel %u: scan: %u", channel, scan);
 
     scan = scan - OFFSET;
     if(scan < 0) scan = 0; //Don't return negative numbers
@@ -132,14 +130,16 @@ void get_led_values(uint16_t* green_val, uint16_t* red_val){
 
     uint16_t total = chan_9 + chan_10;
     
-    if(total > MIN_VAL){
-        *green_val = (100 *chan_9) / total;
-        *red_val = (100 * chan_10) / total;
-    }
-    else{
+
+    if(total <= MIN_VAL){
         *green_val = 0;
         *red_val = 0;
+        return;
     }
+
+    *green_val = (100 *chan_9) / total;
+    *red_val = (100 * chan_10) / total;
+
 }
 
 
@@ -161,7 +161,6 @@ int main(void)
     {
         get_led_values(&green_led_val, &red_led_val);
 
-        PRINTF("Red: %u, green: %u\n", red_led_val, green_led_val);
         /* Start PWM mode with updated duty cycle */
         TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)LED_GREEN_CHANNEL, kTPM_EdgeAlignedPwm,
                                green_led_val);
