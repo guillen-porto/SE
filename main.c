@@ -16,6 +16,9 @@
 /* Get source clock for TPM driver */
 #define TPM_SOURCE_CLOCK CLOCK_GetFreq(kCLOCK_PllFllSelClk)
 
+#define OFFSET 1000
+#define MIN_VAL 500
+
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
@@ -40,11 +43,11 @@ void TSI_Init(void)
      
     TSI0->GENCS = TSI_GENCS_OUTRGF_MASK |  // Out of range flag, set to 1 to clear
                                 //TSI_GENCS_ESOR_MASK |  // This is disabled to give an interrupt when out of range.  Enable to give an interrupt when end of scan
-                                TSI_GENCS_MODE(0u) |  // Set at 0 for capacitive sensing.  Other settings are 4 and 8 for threshold detection, and 12 for noise detection
-                                TSI_GENCS_REFCHRG(0u) | // 0-7 for Reference charge
-                                TSI_GENCS_DVOLT(0u) | // 0-3 sets the Voltage range
-                                TSI_GENCS_EXTCHRG(0u) | //0-7 for External charge
-                                TSI_GENCS_PS(0u) | // 0-7 for electrode prescaler
+                                TSI_GENCS_MODE(4u) |  // Set at 0 for capacitive sensing.  Other settings are 4 and 8 for threshold detection, and 12 for noise detection
+                                TSI_GENCS_REFCHRG(4u) | // 0-7 for Reference charge
+                                TSI_GENCS_DVOLT(1u) | // 0-3 sets the Voltage range
+                                TSI_GENCS_EXTCHRG(5u) | //0-7 for External charge
+                                TSI_GENCS_PS(2u) | // 0-7 for electrode prescaler
                                 TSI_GENCS_NSCN(31u) | // 0-31 + 1 for number of scans per electrode
                                 TSI_GENCS_TSIEN_MASK | // TSI enable bit
                                 //TSI_GENCS_TSIIEN_MASK | //TSI interrupt is disables
@@ -80,33 +83,6 @@ void PWM_Init(void){
 
     CLOCK_SetTpmClock(1U);
 
-    TPM_GetDefaultConfig(&tpmInfo);
-    /* Initialize TPM module */
-    TPM_Init(BOARD_TPM_BASEADDR, &tpmInfo);
-
-    TPM_SetupPwm(BOARD_TPM_BASEADDR, tpmParam, 2U, kTPM_EdgeAlignedPwm, 24000U, TPM_SOURCE_CLOCK);
-    TPM_StartTimer(BOARD_TPM_BASEADDR, kTPM_SystemClock);
-}
-
-
-
-
-
-int main(void)
-{
-    PWM_Init();
-    TSI_Init();
-
-    /* Board pin, clock, debug console init */
-    BOARD_InitPins();
-    BOARD_BootClockRUN();
-    BOARD_InitDebugConsole();
-    /* Select the clock source for the TPM counter as kCLOCK_PllFllSelClk */
-
-    /* Print a note to terminal */
-    PRINTF("\r\nTPM example to output PWM on 2 channels\r\n");
-    PRINTF("\r\nIf an LED is connected to the TPM pin, you will see a change in LED brightness if you enter different values");
-    PRINTF("\r\nIf no LED is connected to the TPM pin, then probe the signal using an oscilloscope");
 
     /*
      * tpmInfo.prescale = kTPM_Prescale_Divide_1;
@@ -119,28 +95,71 @@ int main(void)
      * tpmInfo.enablePauseOnTrigger = false;
      * tpmInfo.triggerSelect = kTPM_Trigger_Select_0;
      * tpmInfo.triggerSource = kTPM_TriggerSource_External;
-     */
+     * */
+    TPM_GetDefaultConfig(&tpmInfo);
+    /* Initialize TPM module */
+    TPM_Init(BOARD_TPM_BASEADDR, &tpmInfo);
+
+    TPM_SetupPwm(BOARD_TPM_BASEADDR, tpmParam, 2U, kTPM_EdgeAlignedPwm, 24000U, TPM_SOURCE_CLOCK);
+    TPM_StartTimer(BOARD_TPM_BASEADDR, kTPM_SystemClock);
+}
+
+
+
+//Function to read a channel of the TSI ()
+uint16_t read_TSI_channel(uint8_t channel)
+{
+    int scan;
+    TSI0->DATA =     TSI_DATA_TSICH(channel); // Using channel 10 of The TSI
+    TSI0->DATA |= TSI_DATA_SWTS(1); // Software trigger for scan
+
+    while (!(TSI0->GENCS & TSI_GENCS_EOSF_MASK)); //Wait until scan has ended (end of scan flag set to 1)
+    scan = TSI0->DATA & TSI_DATA_TSICNT_MASK; //Read the content of the counter in the TSI_DATA register
+    TSI0->GENCS |= TSI_GENCS_EOSF_MASK ; // Reset end of scan flag
+     
+    //PRINTF("Channel %u: scan: %u", channel, scan);
+
+    scan = scan - OFFSET;
+    if(scan < 0) scan = 0; //Don't return negative numbers
+    return scan;
+}
+
+
+void get_led_values(uint16_t* green_val, uint16_t* red_val){
+    uint16_t chan_9 = read_TSI_channel(9);
+    uint16_t chan_10 = read_TSI_channel(10);
+
+    uint16_t total = chan_9 + chan_10;
+    
+    if(total > MIN_VAL){
+        *green_val = (100 *chan_9) / total;
+        *red_val = (100 * chan_10) / total;
+    }
+}
+
+
+int main(void)
+{
+    PWM_Init();
+    TSI_Init();
+
+    /* Board pin, clock, debug console init */
+    BOARD_InitPins();
+    BOARD_BootClockRUN();
+    BOARD_InitDebugConsole();
+
+    uint16_t green_led_val = 0;
+    uint16_t red_led_val = 0;
+    /* Select the clock source for the TPM counter as kCLOCK_PllFllSelClk */
     while (1)
     {
-        do
-        {
-            PRINTF("\r\nPlease enter a value to update the Duty cycle:\r\n");
-            PRINTF("Note: The range of value is 0 to 9.\r\n");
-            PRINTF("For example: If enter '5', the duty cycle will be set to 50 percent.\r\n");
-            PRINTF("Value:");
-            getCharValue = GETCHAR() - 0x30U;
-            PRINTF("%d", getCharValue);
-            PRINTF("\r\n");
-        } while (getCharValue > 9U);
+        get_led_values(&green_led_val, &red_led_val);
 
-        updatedDutycycle = getCharValue * 10U;
-
+        PRINTF("Red: %u, green: %u\n", red_led_val, green_led_val);
         /* Start PWM mode with updated duty cycle */
         TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)LED_GREEN_CHANNEL, kTPM_EdgeAlignedPwm,
-                               updatedDutycycle);
+                               green_led_val);
         TPM_UpdatePwmDutycycle(BOARD_TPM_BASEADDR, (tpm_chnl_t)LED_RED_CHANNEL, kTPM_EdgeAlignedPwm,
-                               updatedDutycycle);
-
-        PRINTF("The duty cycle was successfully updated!\r\n");
+                               red_led_val);
     }
 }
